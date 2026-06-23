@@ -72,7 +72,7 @@ class SimulatorRequest(BaseModel):
 @app.get("/health")
 def health_check():
     return {
-        "status": "healthy", 
+        "status": "healthy",
         "app": settings.app_name,
         "mode": "MOCK" if orchestrator.use_mock else "LIVE"
     }
@@ -112,7 +112,7 @@ def analyze_text(request: TextAnalysisRequest):
 @app.post("/analyze/file", response_model=FinalCoachingResponse)
 def analyze_file(file: UploadFile = File(...)):
     patient_profile = load_patient_profile()
-    
+
     # Save uploaded file to a temporary file
     suffix = os.path.splitext(file.filename)[1]
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:

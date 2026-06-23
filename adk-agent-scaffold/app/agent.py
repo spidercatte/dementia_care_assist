@@ -35,7 +35,7 @@ os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
 
 def get_patient_profile() -> str:
     """Retrieves the active patient's background, dementia staging, triggers, preferences, and daily constraints.
-    
+
     Returns:
         A formatted JSON string of the patient's profile context.
     """
@@ -52,10 +52,10 @@ def get_patient_profile() -> str:
 
 def lookup_dementia_guidelines(query: str) -> str:
     """Search the clinical guidelines database for dementia care protocols and validation therapy techniques.
-    
+
     Args:
         query: 2-3 keywords describing the behavioral symptom (e.g. 'medication refusal', 'shower resistance', 'sundowning').
-        
+
     Returns:
         A string containing relevant care guidelines and evidence-based protocols.
     """
@@ -97,11 +97,11 @@ def lookup_dementia_guidelines(query: str) -> str:
 
 def log_safety_escalation(urgency_level: str, safety_reason: str) -> str:
     """Logs a critical safety hazard or clinician escalation alert.
-    
+
     Args:
         urgency_level: One of 'LOW', 'MEDIUM', 'HIGH', or 'EMERGENCY'.
         safety_reason: The reason for the safety flag (e.g. fall hazard, medication refusal danger, delirium indicators).
-        
+
     Returns:
         A confirmation string stating that the safety alert was captured.
     """
@@ -116,7 +116,7 @@ root_agent = Agent(
     name="dementiacare_coach_agent",
     model=Gemini(
         model="gemini-2.0-flash",
-        api_key="AIzaSyD-mock-key-value-12345",
+        api_key=os.environ.get("GEMINI_API_KEY", "mock-key-value-12345"),
         retry_options=types.HttpRetryOptions(attempts=3),
     ),
     instruction=(

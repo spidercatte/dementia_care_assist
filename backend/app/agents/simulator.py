@@ -35,7 +35,7 @@ class SimulatorAgent:
         for msg in chat_history:
             role = "Caregiver" if msg["role"] == "user" else "Patient (Simulated)"
             formatted_chat += f"{role}: {msg['content']}\n"
-            
+
         prompt = (
             f"You are a training simulator for dementia caregivers. Your task is to play the role of a dementia patient in a training scenario.\n"
             f"You must react realistically based on the caregiver's responses. "
@@ -65,7 +65,7 @@ class SimulatorAgent:
                 response_schema=SimulatorResponse
             )
         )
-        
+
         return SimulatorResponse.model_validate_json(response.text)
 
     def _mock_step(self, scenario: str, chat_history: List[dict]) -> SimulatorResponse:
@@ -78,9 +78,9 @@ class SimulatorAgent:
                 patient_agitation_level=5,
                 coaching_tip="Arthur is confused. Try introducing yourself and validating his feelings."
             )
-            
+
         last_user_message = chat_history[-1]["content"].lower()
-        
+
         # Simple keywords to determine mock behavior
         if "med" in scenario.lower() or "pill" in scenario.lower():
             if any(x in last_user_message for x in ["must", "have to", "wrong", "doctor"]):

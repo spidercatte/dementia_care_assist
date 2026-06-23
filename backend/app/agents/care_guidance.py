@@ -9,9 +9,9 @@ class CareGuidanceAgent:
         self.client = client
 
     def run(
-        self, 
-        interaction_summary: str, 
-        patient_context: str, 
+        self,
+        interaction_summary: str,
+        patient_context: str,
         guidelines_text: str
     ) -> CareGuidanceResponse:
         logger.info("Agent 3 running: Care Guidance (RAG)...")

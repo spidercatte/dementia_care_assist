@@ -1,22 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Activity, 
-  User, 
-  Gamepad2, 
-  BookOpen, 
-  Upload, 
-  MessageSquare, 
-  AlertTriangle, 
-  Heart, 
-  Smile, 
-  ThumbsUp, 
-  CheckCircle2, 
-  Trash2, 
-  Plus, 
-  Search, 
-  Database, 
-  Sparkles, 
-  RefreshCw, 
+import {
+  Activity,
+  User,
+  Gamepad2,
+  BookOpen,
+  Upload,
+  MessageSquare,
+  AlertTriangle,
+  Heart,
+  Smile,
+  ThumbsUp,
+  CheckCircle2,
+  Trash2,
+  Plus,
+  Search,
+  Database,
+  Sparkles,
+  RefreshCw,
   Info,
   Clock,
   Video,
@@ -106,7 +106,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [backendStatus, setBackendStatus] = useState('checking'); // checking, online, offline
   const [isSeeding, setIsSeeding] = useState(false);
-  
+
   // Patient Profile State
   const [patient, setPatient] = useState(MOCK_PATIENT);
   const [newTrigger, setNewTrigger] = useState('');
@@ -126,7 +126,7 @@ function App() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingType, setRecordingType] = useState('video'); // 'video' or 'audio'
   const [showRecorder, setShowRecorder] = useState(false);
-  
+
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const videoPreviewRef = useRef(null);
@@ -155,57 +155,57 @@ function App() {
     cleanupRecording();
     setRecordingType(type);
     chunksRef.current = [];
-    
+
     try {
       const constraints = {
         audio: true,
         video: type === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" } : false
       };
-      
+
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
-      
+
       if (type === 'video' && videoPreviewRef.current) {
         videoPreviewRef.current.srcObject = stream;
       }
-      
+
       let mimeType = type === 'video' ? 'video/webm;codecs=vp9,opus' : 'audio/webm;codecs=opus';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
         mimeType = type === 'video' ? 'video/webm' : 'audio/webm';
       }
-      
+
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
-      
+
       mediaRecorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
           chunksRef.current.push(e.data);
         }
       };
-      
+
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType });
         const ext = mediaRecorder.mimeType.includes('video') ? 'webm' : 'weba';
         const filename = `live-recording-${Date.now()}.${ext}`;
         const file = new File([blob], filename, { type: mediaRecorder.mimeType });
-        
+
         setSelectedFile(file);
         setInputText('');
-        
+
         if (fileUrl) URL.revokeObjectURL(fileUrl);
         setFileUrl(URL.createObjectURL(file));
-        
+
         cleanupRecording();
         setShowRecorder(false);
       };
-      
+
       mediaRecorder.start(100); // chunk every 100ms
       setIsRecording(true);
-      
+
       recordingIntervalRef.current = setInterval(() => {
         setRecordingTime(t => t + 1);
       }, 1000);
-      
+
     } catch (err) {
       console.error("Error starting recording:", err);
       alert("Could not access camera or microphone. Please check permissions.");
@@ -393,7 +393,7 @@ function App() {
                       body: JSON.stringify({ description: inputText })
                     });
                   }
-                  
+
                   if (res.ok) {
                     const data = await res.json();
                     setAnalysisResult(data);
@@ -541,7 +541,7 @@ function App() {
     e.preventDefault();
     if (!ragQuery.trim()) return;
     setIsSearchingRAG(true);
-    
+
     if (backendStatus === 'online') {
       try {
         const res = await fetch(`${BACKEND_URL}/analyze/text`, { // using text endpoint to get RAG feedback
@@ -599,9 +599,9 @@ function App() {
       }
     ];
 
-    const filtered = defaults.filter(d => 
-      d.title.toLowerCase().includes(q) || 
-      d.text.toLowerCase().includes(q) || 
+    const filtered = defaults.filter(d =>
+      d.title.toLowerCase().includes(q) ||
+      d.text.toLowerCase().includes(q) ||
       d.category.toLowerCase().includes(q)
     );
 
@@ -625,16 +625,16 @@ function App() {
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>AI-Powered Caregiver Co-Pilot</p>
           </div>
         </div>
-        
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div className="api-status">
             <span className={`status-dot ${backendStatus === 'online' ? 'online' : backendStatus === 'offline' ? 'offline' : ''}`}></span>
             <span>Agent Server: {backendStatus.toUpperCase()}</span>
           </div>
-          
+
           {backendStatus === 'online' && (
-            <button 
-              className="btn btn-secondary" 
+            <button
+              className="btn btn-secondary"
               style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
               onClick={seedDatabase}
               disabled={isSeeding}
@@ -648,28 +648,28 @@ function App() {
 
       {/* Tab Navigation */}
       <nav className="tab-navigation">
-        <button 
+        <button
           className={`tab-button ${activeTab === 'dashboard' ? 'active' : ''}`}
           onClick={() => setActiveTab('dashboard')}
         >
           <Activity size={18} />
           <span>Interaction Coach</span>
         </button>
-        <button 
+        <button
           className={`tab-button ${activeTab === 'profile' ? 'active' : ''}`}
           onClick={() => setActiveTab('profile')}
         >
           <User size={18} />
           <span>Patient Profile</span>
         </button>
-        <button 
+        <button
           className={`tab-button ${activeTab === 'simulator' ? 'active' : ''}`}
           onClick={() => setActiveTab('simulator')}
         >
           <Gamepad2 size={18} />
           <span>Care Simulator</span>
         </button>
-        <button 
+        <button
           className={`tab-button ${activeTab === 'guidelines' ? 'active' : ''}`}
           onClick={() => setActiveTab('guidelines')}
         >
@@ -691,10 +691,10 @@ function App() {
                 <Upload size={20} className="logo-icon" />
                 Record Interaction
               </h2>
-              
+
               <div className="form-group">
                 <label className="form-label">Option A: Record or Upload Interaction</label>
-                
+
                 {showRecorder ? (
                   <div className="recorder-container">
                     <div className="recorder-header">
@@ -706,13 +706,13 @@ function App() {
                       </div>
                       <span className="recording-timer">{formatTime(recordingTime)}</span>
                     </div>
-                    
+
                     {recordingType === 'video' && (
                       <div className="webcam-preview-box">
                         <video ref={videoPreviewRef} autoPlay playsInline muted className="webcam-video" />
                       </div>
                     )}
-                    
+
                     {recordingType === 'audio' && (
                       <div className="audio-recording-box">
                         <Mic size={32} className={isRecording ? 'pulse' : ''} style={{ color: 'var(--primary)' }} />
@@ -721,10 +721,10 @@ function App() {
                         </span>
                       </div>
                     )}
-                    
+
                     <div className="recorder-controls">
                       {!isRecording ? (
-                        <button 
+                        <button
                           type="button"
                           className="btn btn-primary"
                           onClick={() => startRecording(recordingType)}
@@ -733,7 +733,7 @@ function App() {
                           Start
                         </button>
                       ) : (
-                        <button 
+                        <button
                           type="button"
                           className="btn btn-danger"
                           onClick={stopRecording}
@@ -743,7 +743,7 @@ function App() {
                           Stop & Use
                         </button>
                       )}
-                      <button 
+                      <button
                         type="button"
                         className="btn btn-secondary"
                         onClick={() => { cleanupRecording(); setShowRecorder(false); }}
@@ -754,7 +754,7 @@ function App() {
                   </div>
                 ) : (
                   <>
-                    <div 
+                    <div
                       className="upload-dropzone"
                       onClick={() => document.getElementById('file-upload').click()}
                     >
@@ -762,10 +762,10 @@ function App() {
                       <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>Drag file here or click to browse</p>
                       <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Supports MP4, MOV, MP3, WAV</p>
                     </div>
-                    
+
                     <div className="record-actions-row">
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         className="btn btn-secondary btn-sm"
                         onClick={() => { setShowRecorder(true); startRecording('video'); }}
                         style={{ flex: 1 }}
@@ -773,8 +773,8 @@ function App() {
                         <Video size={14} style={{ marginRight: '0.4rem' }} />
                         Record Video
                       </button>
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         className="btn btn-secondary btn-sm"
                         onClick={() => { setShowRecorder(true); startRecording('audio'); }}
                         style={{ flex: 1 }}
@@ -785,15 +785,15 @@ function App() {
                     </div>
                   </>
                 )}
-                
-                <input 
-                  type="file" 
-                  id="file-upload" 
-                  style={{ display: 'none' }} 
+
+                <input
+                  type="file"
+                  id="file-upload"
+                  style={{ display: 'none' }}
                   onChange={handleFileChange}
                   accept="video/*,audio/*"
                 />
-                
+
                 {selectedFile && !showRecorder && (
                   <div className="media-preview-card">
                     <div className="media-preview-header">
@@ -801,7 +801,7 @@ function App() {
                         <Activity size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                         <span className="media-preview-title" title={selectedFile.name}>{selectedFile.name}</span>
                       </div>
-                      <button 
+                      <button
                         type="button"
                         className="tag-delete-btn"
                         onClick={() => { setSelectedFile(null); setFileUrl(null); }}
@@ -832,7 +832,7 @@ function App() {
 
               <div className="form-group">
                 <label className="form-label">Option B: Describe the Interaction (Text)</label>
-                <textarea 
+                <textarea
                   className="form-textarea"
                   rows={6}
                   placeholder="Example: Dad got agitated when I showed him his heart pill. He accused me of stealing and yelled that he wouldn't take it. I showed him the medicine bottle and told him he was wrong, which made him shout louder..."
@@ -844,7 +844,7 @@ function App() {
                 ></textarea>
               </div>
 
-              <button 
+              <button
                 className="btn btn-primary"
                 onClick={handleAnalyze}
                 disabled={isAnalyzing || (!inputText.trim() && !selectedFile)}
@@ -866,27 +866,27 @@ function App() {
               {isAnalyzing && (
                 <div className="pipeline-status">
                   <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)' }}>Orchestrating Specialized Agents:</p>
-                  
+
                   <div className={`pipeline-step ${analysisStep === 1 ? 'active' : analysisStep > 1 ? 'completed' : ''}`}>
                     {analysisStep === 1 ? <div className="spinner" /> : <CheckCircle2 size={14} />}
                     <span>Agent 1: Interaction Analysis (Verbal & Non-verbal Cues)</span>
                   </div>
-                  
+
                   <div className={`pipeline-step ${analysisStep === 2 ? 'active' : analysisStep > 2 ? 'completed' : ''}`}>
                     {analysisStep === 2 ? <div className="spinner" /> : <CheckCircle2 size={14} />}
                     <span>Agent 2: Patient Context Integration (Med Schedule, Triggers)</span>
                   </div>
-                  
+
                   <div className={`pipeline-step ${analysisStep === 3 ? 'active' : analysisStep > 3 ? 'completed' : ''}`}>
                     {analysisStep === 3 ? <div className="spinner" /> : <CheckCircle2 size={14} />}
                     <span>Agent 3: Clinical Care RAG Ingestion (Nursing/OT Protocols)</span>
                   </div>
-                  
+
                   <div className={`pipeline-step ${analysisStep === 4 ? 'active' : analysisStep > 4 ? 'completed' : ''}`}>
                     {analysisStep === 4 ? <div className="spinner" /> : <CheckCircle2 size={14} />}
                     <span>Agent 4: Safety & Medical Escalation Risk Check</span>
                   </div>
-                  
+
                   <div className={`pipeline-step ${analysisStep === 5 ? 'active' : ''}`}>
                     {analysisStep === 5 ? <div className="spinner" /> : <CheckCircle2 size={14} />}
                     <span>Agent 5: Caregiver Coaching Synthesis (Empathetic Dialogue Scripts)</span>
@@ -901,7 +901,7 @@ function App() {
                 <Sparkles size={20} className="logo-icon" />
                 Coaching Feedback
               </h2>
-              
+
               {!analysisResult && !isAnalyzing && (
                 <div style={{ textAlign: 'center', padding: '4rem 1.5rem', color: 'var(--text-muted)' }}>
                   <Activity size={48} style={{ opacity: 0.2, margin: '0 auto 1rem' }} />
@@ -920,7 +920,7 @@ function App() {
 
               {analysisResult && !isAnalyzing && (
                 <div className="feedback-grid fade-in">
-                  
+
                   {/* Summary & Behavior Recognition */}
                   <div className="glass-card feedback-full-width" style={{ background: 'rgba(15, 23, 42, 0.3)', gap: '0.75rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -933,7 +933,7 @@ function App() {
                     <p style={{ fontSize: '0.95rem', fontStyle: 'italic', color: 'var(--text-light)' }}>
                       "{analysisResult.behavior_analysis.interaction_summary}"
                     </p>
-                    
+
                     <div className="analysis-score-container" style={{ marginTop: '0.5rem' }}>
                       <div className="score-box">
                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Patient Triggers</p>
@@ -1023,7 +1023,7 @@ function App() {
                     <h3 style={{ fontSize: '1.1rem', fontWeight: 600, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
                       Clinical Care Protocols (Synthesized via RAG)
                     </h3>
-                    
+
                     {analysisResult.recommendations.map((rec, idx) => (
                       <div key={idx} className="glass-card" style={{ background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.15)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1061,9 +1061,9 @@ function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label className="form-label">Patient Name</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
+                  <input
+                    type="text"
+                    className="form-input"
                     value={patient.name}
                     onChange={(e) => setPatient({ ...patient, name: e.target.value })}
                     required
@@ -1071,9 +1071,9 @@ function App() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Dementia Stage / Type</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
+                  <input
+                    type="text"
+                    className="form-input"
                     value={patient.dementia_type}
                     onChange={(e) => setPatient({ ...patient, dementia_type: e.target.value })}
                     required
@@ -1085,9 +1085,9 @@ function App() {
               <div className="form-group">
                 <label className="form-label">Known Behavioral Triggers (E.g. direct correction)</label>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <input 
-                    type="text" 
-                    className="form-input" 
+                  <input
+                    type="text"
+                    className="form-input"
                     style={{ flex: 1 }}
                     placeholder="E.g., being rushed, loud voices"
                     value={newTrigger}
@@ -1114,9 +1114,9 @@ function App() {
               <div className="form-group">
                 <label className="form-label">Comfort items, routines & preferences</label>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <input 
-                    type="text" 
-                    className="form-input" 
+                  <input
+                    type="text"
+                    className="form-input"
                     style={{ flex: 1 }}
                     placeholder="E.g., 1950s big band music, warm cider"
                     value={newPreference}
@@ -1142,8 +1142,8 @@ function App() {
               {/* Background / History */}
               <div className="form-group">
                 <label className="form-label">Clinical Background, Trauma History & Daily Challenges</label>
-                <textarea 
-                  className="form-textarea" 
+                <textarea
+                  className="form-textarea"
                   rows={5}
                   value={patient.background}
                   onChange={(e) => setPatient({ ...patient, background: e.target.value })}
@@ -1175,11 +1175,11 @@ function App() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {MOCK_SCENARIOS.map((scen) => (
-                  <div 
-                    key={scen.id} 
+                  <div
+                    key={scen.id}
                     className={`glass-card ${selectedScenario.id === scen.id ? 'active' : ''}`}
-                    style={{ 
-                      padding: '1rem', 
+                    style={{
+                      padding: '1rem',
                       cursor: 'pointer',
                       background: selectedScenario.id === scen.id ? 'rgba(6, 182, 212, 0.08)' : 'var(--bg-card)',
                       borderColor: selectedScenario.id === scen.id ? 'var(--primary)' : 'var(--border-color)'
@@ -1204,7 +1204,7 @@ function App() {
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Training Chat with Arthur</h3>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Scenario: {selectedScenario.title}</p>
                 </div>
-                
+
                 {/* Agitation Score Meter */}
                 <div className="agitation-meter-wrapper">
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>Arthur's Agitation:</span>
@@ -1212,10 +1212,10 @@ function App() {
                     {simAgitation}/10
                   </span>
                   <div className="agitation-bar-container">
-                    <div 
-                      className="agitation-bar-fill" 
-                      style={{ 
-                        width: `${simAgitation * 10}%`, 
+                    <div
+                      className="agitation-bar-fill"
+                      style={{
+                        width: `${simAgitation * 10}%`,
                         backgroundColor: simAgitation > 7 ? 'var(--color-danger)' : simAgitation > 4 ? 'var(--color-warning)' : 'var(--color-success)'
                       }}
                     ></div>
@@ -1226,21 +1226,21 @@ function App() {
               {/* Chat Bubble History */}
               <div className="chat-history">
                 {simHistory.map((msg, index) => (
-                  <div 
-                    key={index} 
+                  <div
+                    key={index}
                     className={`chat-bubble ${msg.role === 'user' ? 'caregiver' : 'patient'}`}
                   >
                     {msg.content}
                   </div>
                 ))}
-                
+
                 {isSimLoading && (
                   <div className="chat-bubble patient" style={{ opacity: 0.6 }}>
                     <RefreshCw className="spinner" size={14} style={{ display: 'inline-block', marginRight: '0.5rem' }} />
                     Arthur is thinking...
                   </div>
                 )}
-                
+
                 {/* Hidden Coaching Tip Popover */}
                 {simTip && !isSimLoading && (
                   <div className="coaching-toast">
@@ -1252,9 +1252,9 @@ function App() {
 
               {/* Input Message Form */}
               <form onSubmit={handleSendSimMessage} className="chat-input-area">
-                <input 
-                  type="text" 
-                  className="form-input" 
+                <input
+                  type="text"
+                  className="form-input"
                   style={{ flex: 1 }}
                   placeholder="Type your response to Arthur..."
                   value={simInput}
@@ -1283,9 +1283,9 @@ function App() {
             </p>
 
             <form onSubmit={handleRAGSearch} style={{ display: 'flex', gap: '0.5rem', margin: '1rem 0' }}>
-              <input 
-                type="text" 
-                className="form-input" 
+              <input
+                type="text"
+                className="form-input"
                 style={{ flex: 1 }}
                 placeholder="Search database: e.g. medication refusal, bathing resistance, validation therapy..."
                 value={ragQuery}
@@ -1301,7 +1301,7 @@ function App() {
               <h3 style={{ fontSize: '1rem', fontWeight: 600, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', color: 'var(--primary)' }}>
                 {ragResults.length > 0 ? 'Search Results' : 'Default Guidelines Injected in ChromaDB'}
               </h3>
-              
+
               {isSearchingRAG ? (
                 <div style={{ textAlign: 'center', padding: '2rem' }}>
                   <RefreshCw className="spinner" size={24} style={{ margin: '0 auto' }} />

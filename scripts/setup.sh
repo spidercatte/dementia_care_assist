@@ -11,17 +11,15 @@ echo "=== Setting up DementiaCare Coach in $WORKSPACE_DIR ==="
 echo "--> Configuring Backend..."
 cd "$WORKSPACE_DIR/backend"
 
-if [ ! -d "venv" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv venv
-else
-    echo "Virtual environment already exists."
+# Check if poetry is installed
+if ! command -v poetry &> /dev/null; then
+    echo "Error: Poetry is not installed."
+    exit 1
 fi
 
-echo "Activating virtual environment and installing dependencies..."
-source venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+echo "Setting up Poetry environment and installing dependencies..."
+poetry env use 3.12
+poetry run pip install -r requirements.txt
 
 if [ ! -f ".env" ]; then
     echo "Creating .env from .env.example..."

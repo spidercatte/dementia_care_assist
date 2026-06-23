@@ -1,7 +1,7 @@
 import logging
 from google.genai import types
 from app.schemas import (
-    FinalCoachingResponse, 
+    FinalCoachingResponse,
     InteractionAnalysisResponse,
     PatientContextResponse,
     CareGuidanceResponse,

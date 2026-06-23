@@ -137,4 +137,3 @@ When running the app for the first time, click the **"Seed RAG DB"** button in t
 * 🏥 **EHR (Electronic Health Record) integration**
 * 🔮 **Predictive behavior forecasting**
 * 🎓 **Caregiver training simulations**
-

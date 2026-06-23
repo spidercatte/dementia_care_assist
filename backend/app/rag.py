@@ -25,7 +25,7 @@ class GeminiEmbeddingFunction(EmbeddingFunction):
             else:
                 logger.warning("Gemini API Client is not initialized. Generating dummy mock embeddings.")
                 return [[0.0] * 768 for _ in texts]
-        
+
         try:
             embeddings = []
             for text in texts:
@@ -88,27 +88,27 @@ def seed_default_guidelines():
     import os
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
     file_path = os.path.join(data_dir, "dementia_care_guidelines.md")
-    
+
     if not os.path.exists(file_path):
         logger.error(f"Guidelines markdown file not found at: {file_path}")
         return
-        
+
     try:
         with open(file_path, "r") as f:
             content = f.read()
-            
+
         sections = content.split("##")
         # First section is '# Clinical Dementia Care Guidelines\n\n', discard it
         sections = sections[1:]
-        
+
         for idx, sec in enumerate(sections):
             lines = sec.strip().split("\n")
             title = lines[0].strip()
             body = "\n".join(lines[1:]).strip()
-            
+
             # Simple slug generator for ID
             doc_id = title.lower().replace(" ", "_").replace("/", "_").replace("&", "_").replace("(", "").replace(")", "")
-            
+
             ingest_guideline(
                 doc_id=doc_id,
                 text=body,
@@ -119,4 +119,3 @@ def seed_default_guidelines():
     except Exception as e:
         logger.error(f"Error seeding guidelines from file: {e}")
         raise e
-

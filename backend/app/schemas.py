@@ -63,7 +63,7 @@ class FinalCoachingResponse(BaseModel):
     try_saying: str = Field(description="Empathetic script or phrase the caregiver should use")
     avoid_saying: str = Field(description="Specific logical/corrective phrase the caregiver should avoid")
     safety_note: str = Field(description="Immediate safety warnings or clinical instructions")
-    
+
     # Matching UI Expectations
     behavior_analysis: BehaviorRecognition = Field(description="Combined behavior details")
     strengths: List[str] = Field(description="What the caregiver did well")

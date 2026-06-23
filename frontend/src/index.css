@@ -9,26 +9,26 @@
   --bg-dark: #0f172a;
   --bg-card: rgba(30, 41, 59, 0.7);
   --bg-card-hover: rgba(30, 41, 59, 0.95);
-  
+
   --primary: #06b6d4;      /* Calm Teal */
   --primary-hover: #0891b2;
   --primary-glow: rgba(6, 182, 212, 0.15);
-  
+
   --secondary: #6366f1;    /* Gentle Indigo */
   --secondary-glow: rgba(99, 102, 241, 0.15);
-  
+
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --text-light: #cbd5e1;
-  
+
   --border-color: rgba(255, 255, 255, 0.08);
   --border-focus: rgba(6, 182, 212, 0.5);
-  
+
   /* Status Colors */
   --color-success: #10b981;  /* Patient Calm Green */
   --color-warning: #f59e0b;  /* Caution Amber */
   --color-danger: #ef4444;   /* Patient Agitation Red */
-  
+
   color-scheme: dark;
   background-color: var(--bg-dark);
   color: var(--text-main);

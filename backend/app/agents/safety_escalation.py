@@ -10,9 +10,9 @@ class SafetyEscalationAgent:
         self.client = client
 
     def run(
-        self, 
-        interaction_summary: str, 
-        health_risk_factors: List[str], 
+        self,
+        interaction_summary: str,
+        health_risk_factors: List[str],
         clinical_advice: str
     ) -> SafetyEscalationResponse:
         logger.info("Agent 4 running: Safety & Escalation...")

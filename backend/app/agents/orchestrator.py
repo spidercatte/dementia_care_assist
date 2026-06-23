@@ -21,7 +21,7 @@ class OrchestratorAgent:
     def __init__(self):
         self.use_mock = False
         self.client = None
-        
+
         # Check if API key exists
         if not settings.gemini_api_key:
             logger.warning("GEMINI_API_KEY is not configured. Orchestrator running in MOCK mode.")
@@ -65,7 +65,7 @@ class OrchestratorAgent:
             logger.info(f"Retrieving care guidelines for query: '{analysis.rag_query}'")
             retrieved_docs = query_guidelines(analysis.rag_query, n_results=2)
             guidelines_text = "\n\n".join([
-                f"Guideline: {doc['metadata'].get('title', 'General')}\n{doc['document']}" 
+                f"Guideline: {doc['metadata'].get('title', 'General')}\n{doc['document']}"
                 for doc in retrieved_docs
             ])
 
@@ -116,17 +116,17 @@ class OrchestratorAgent:
         logger.info(f"Uploading file {file_path} to Gemini File API...")
         uploaded_file = self.client.files.upload(file=file_path)
         logger.info(f"Uploaded file name: {uploaded_file.name}")
-        
+
         try:
             # Wait for file to become active
             import time
             max_retries = 30  # Wait up to 60 seconds (30 * 2)
             retry_interval = 2
-            
+
             for i in range(max_retries):
                 file_info = self.client.files.get(name=uploaded_file.name)
                 state = file_info.state.name if hasattr(file_info.state, 'name') else str(file_info.state)
-                
+
                 if state == "ACTIVE":
                     logger.info("File state is ACTIVE and ready for processing.")
                     break
@@ -142,7 +142,7 @@ class OrchestratorAgent:
                 raise Exception("File processing timed out on Gemini File API.")
 
             feedback = self.run_pipeline(
-                contents=[uploaded_file], 
+                contents=[uploaded_file],
                 patient_profile=patient_profile
             )
         finally:
@@ -151,5 +151,5 @@ class OrchestratorAgent:
                 self.client.files.delete(name=uploaded_file.name)
             except Exception as e:
                 logger.error(f"Failed to delete file from Gemini API: {e}")
-                
+
         return feedback
