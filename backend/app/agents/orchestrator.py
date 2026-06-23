@@ -107,10 +107,10 @@ class OrchestratorAgent:
     def analyze_text(self, description: str, patient_profile: dict) -> FinalCoachingResponse:
         return self.run_pipeline(contents=[description], patient_profile=patient_profile)
 
-    def analyze_file(self, file_path: str, mime_type: str, patient_profile: dict) -> FinalCoachingResponse:
+    def analyze_file(self, file_path: str, mime_type: str, patient_profile: dict, original_filename: str = None) -> FinalCoachingResponse:
         if self.use_mock:
             # Immediately resolve file uploads using a mock response based on filename
-            filename = file_path.split("/")[-1]
+            filename = original_filename or file_path.split("/")[-1]
             return get_mock_coaching_response(filename)
 
         logger.info(f"Uploading file {file_path} to Gemini File API...")
@@ -118,6 +118,29 @@ class OrchestratorAgent:
         logger.info(f"Uploaded file name: {uploaded_file.name}")
         
         try:
+            # Wait for file to become active
+            import time
+            max_retries = 30  # Wait up to 60 seconds (30 * 2)
+            retry_interval = 2
+            
+            for i in range(max_retries):
+                file_info = self.client.files.get(name=uploaded_file.name)
+                state = file_info.state.name if hasattr(file_info.state, 'name') else str(file_info.state)
+                
+                if state == "ACTIVE":
+                    logger.info("File state is ACTIVE and ready for processing.")
+                    break
+                elif state == "FAILED":
+                    raise Exception(f"File processing failed on Gemini servers: {getattr(file_info, 'error', 'Unknown error')}")
+                elif state == "PROCESSING":
+                    logger.info(f"File is PROCESSING (check {i+1}/{max_retries}), waiting...")
+                    time.sleep(retry_interval)
+                else:
+                    logger.warning(f"Unknown file state encountered: {state}")
+                    time.sleep(retry_interval)
+            else:
+                raise Exception("File processing timed out on Gemini File API.")
+
             feedback = self.run_pipeline(
                 contents=[uploaded_file], 
                 patient_profile=patient_profile

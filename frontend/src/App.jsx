@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Activity, 
   User, 
@@ -18,7 +18,13 @@ import {
   Sparkles, 
   RefreshCw, 
   Info,
-  Clock
+  Clock,
+  Video,
+  VideoOff,
+  Mic,
+  Square,
+  Volume2,
+  Circle
 } from 'lucide-react';
 
 const BACKEND_URL = 'http://localhost:8000';
@@ -113,6 +119,111 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisStep, setAnalysisStep] = useState(0); // 0: Idle, 1: Interaction Analysis, 2: Context Evaluation, 3: Guideline RAG, 4: Safety Assessment, 5: Coaching Synthesis
+
+  // Live Recording & Preview State
+  const [fileUrl, setFileUrl] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [recordingType, setRecordingType] = useState('video'); // 'video' or 'audio'
+  const [showRecorder, setShowRecorder] = useState(false);
+  
+  const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
+  const videoPreviewRef = useRef(null);
+  const recordingIntervalRef = useRef(null);
+  const chunksRef = useRef([]);
+
+  // Clean up recording stream & timer
+  const cleanupRecording = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+    setIsRecording(false);
+    setRecordingTime(0);
+  };
+
+  useEffect(() => {
+    return () => cleanupRecording();
+  }, []);
+
+  const startRecording = async (type = 'video') => {
+    cleanupRecording();
+    setRecordingType(type);
+    chunksRef.current = [];
+    
+    try {
+      const constraints = {
+        audio: true,
+        video: type === 'video' ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" } : false
+      };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+      
+      if (type === 'video' && videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = stream;
+      }
+      
+      let mimeType = type === 'video' ? 'video/webm;codecs=vp9,opus' : 'audio/webm;codecs=opus';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = type === 'video' ? 'video/webm' : 'audio/webm';
+      }
+      
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = mediaRecorder;
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType });
+        const ext = mediaRecorder.mimeType.includes('video') ? 'webm' : 'weba';
+        const filename = `live-recording-${Date.now()}.${ext}`;
+        const file = new File([blob], filename, { type: mediaRecorder.mimeType });
+        
+        setSelectedFile(file);
+        setInputText('');
+        
+        if (fileUrl) URL.revokeObjectURL(fileUrl);
+        setFileUrl(URL.createObjectURL(file));
+        
+        cleanupRecording();
+        setShowRecorder(false);
+      };
+      
+      mediaRecorder.start(100); // chunk every 100ms
+      setIsRecording(true);
+      
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(t => t + 1);
+      }, 1000);
+      
+    } catch (err) {
+      console.error("Error starting recording:", err);
+      alert("Could not access camera or microphone. Please check permissions.");
+      cleanupRecording();
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const formatTime = (secs) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, '0');
+    const s = (secs % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
 
   // Simulator State
   const [selectedScenario, setSelectedScenario] = useState(MOCK_SCENARIOS[0]);
@@ -239,8 +350,13 @@ function App() {
   // ----------------------------------------------------
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      setSelectedFile(file);
       setInputText('');
+      if (fileUrl) {
+        URL.revokeObjectURL(fileUrl);
+      }
+      setFileUrl(URL.createObjectURL(file));
     }
   };
 
@@ -577,15 +693,99 @@ function App() {
               </h2>
               
               <div className="form-group">
-                <label className="form-label">Option A: Upload Video/Audio Interaction</label>
-                <div 
-                  className="upload-dropzone"
-                  onClick={() => document.getElementById('file-upload').click()}
-                >
-                  <Upload size={32} style={{ color: 'var(--primary)' }} />
-                  <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>Drag file here or click to browse</p>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Supports MP4, MOV, MP3, WAV</p>
-                </div>
+                <label className="form-label">Option A: Record or Upload Interaction</label>
+                
+                {showRecorder ? (
+                  <div className="recorder-container">
+                    <div className="recorder-header">
+                      <div className="recording-status">
+                        <span className={`status-dot ${isRecording ? 'online blink' : ''}`} style={{ backgroundColor: '#ef4444' }}></span>
+                        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                          {isRecording ? `Recording ${recordingType}...` : 'Ready to Record'}
+                        </span>
+                      </div>
+                      <span className="recording-timer">{formatTime(recordingTime)}</span>
+                    </div>
+                    
+                    {recordingType === 'video' && (
+                      <div className="webcam-preview-box">
+                        <video ref={videoPreviewRef} autoPlay playsInline muted className="webcam-video" />
+                      </div>
+                    )}
+                    
+                    {recordingType === 'audio' && (
+                      <div className="audio-recording-box">
+                        <Mic size={32} className={isRecording ? 'pulse' : ''} style={{ color: 'var(--primary)' }} />
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                          {isRecording ? 'Recording audio through microphone...' : 'Microphone ready.'}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="recorder-controls">
+                      {!isRecording ? (
+                        <button 
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() => startRecording(recordingType)}
+                        >
+                          <Circle size={14} fill="#ef4444" style={{ color: '#ef4444', marginRight: '0.25rem' }} />
+                          Start
+                        </button>
+                      ) : (
+                        <button 
+                          type="button"
+                          className="btn btn-danger"
+                          onClick={stopRecording}
+                          style={{ backgroundColor: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
+                        >
+                          <Square size={14} fill="#fff" style={{ marginRight: '0.25rem' }} />
+                          Stop & Use
+                        </button>
+                      )}
+                      <button 
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => { cleanupRecording(); setShowRecorder(false); }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div 
+                      className="upload-dropzone"
+                      onClick={() => document.getElementById('file-upload').click()}
+                    >
+                      <Upload size={32} style={{ color: 'var(--primary)' }} />
+                      <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>Drag file here or click to browse</p>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Supports MP4, MOV, MP3, WAV</p>
+                    </div>
+                    
+                    <div className="record-actions-row">
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => { setShowRecorder(true); startRecording('video'); }}
+                        style={{ flex: 1 }}
+                      >
+                        <Video size={14} style={{ marginRight: '0.4rem' }} />
+                        Record Video
+                      </button>
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => { setShowRecorder(true); startRecording('audio'); }}
+                        style={{ flex: 1 }}
+                      >
+                        <Mic size={14} style={{ marginRight: '0.4rem' }} />
+                        Record Audio
+                      </button>
+                    </div>
+                  </>
+                )}
+                
                 <input 
                   type="file" 
                   id="file-upload" 
@@ -593,18 +793,35 @@ function App() {
                   onChange={handleFileChange}
                   accept="video/*,audio/*"
                 />
-                {selectedFile && (
-                  <div className="file-preview">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Activity size={16} style={{ color: 'var(--primary)' }} />
-                      <span style={{ fontWeight: 500 }}>{selectedFile.name}</span>
+                
+                {selectedFile && !showRecorder && (
+                  <div className="media-preview-card">
+                    <div className="media-preview-header">
+                      <div className="media-preview-info">
+                        <Activity size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                        <span className="media-preview-title" title={selectedFile.name}>{selectedFile.name}</span>
+                      </div>
+                      <button 
+                        type="button"
+                        className="tag-delete-btn"
+                        onClick={() => { setSelectedFile(null); setFileUrl(null); }}
+                        style={{ padding: '0.25rem' }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
-                    <button 
-                      className="tag-delete-btn"
-                      onClick={() => setSelectedFile(null)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="media-player-wrapper">
+                      {selectedFile.type.startsWith('video/') || selectedFile.name.endsWith('.webm') || selectedFile.name.endsWith('.mp4') || selectedFile.name.endsWith('.mov') ? (
+                        <video className="media-player" src={fileUrl} controls playsInline />
+                      ) : selectedFile.type.startsWith('audio/') || selectedFile.name.endsWith('.mp3') || selectedFile.name.endsWith('.wav') || selectedFile.name.endsWith('.weba') ? (
+                        <audio className="media-player audio" src={fileUrl} controls />
+                      ) : (
+                        <div className="generic-file-preview">
+                          <Activity size={24} />
+                          <span>File ready for upload</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

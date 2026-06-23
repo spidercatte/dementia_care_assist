@@ -7,6 +7,42 @@ This project was built for the **AI Agents: Intensive Vibe Coding Capstone Proje
 
 ---
 
+## Project Overview
+
+### Problem
+Dementia caregivers often face aggressive behaviors, confusion, wandering, and emotional distress. Most family caregivers receive little training and struggle to respond effectively in difficult situations.
+
+### Solution
+DementiaCare Coach is an AI agent that analyzes caregiver-patient interactions through video, audio, and patient history. The system provides personalized coaching recommendations grounded in dementia care best practices.
+
+### Key Features (Product Goals)
+* 📹 **Video interaction analysis**
+* 🎭 **Emotion and behavior recognition**
+* 💡 **Personalized coaching suggestions**
+* 🧠 **Patient context awareness**
+* 🏥 **Medical condition integration**
+* 🤝 **Trauma-informed care guidance**
+* 📊 **Caregiver education and feedback**
+
+### How It Works
+1. **Caregiver records an interaction.**
+2. **AI analyzes verbal and non-verbal signals.**
+3. **Patient profile is retrieved.**
+4. **Agent reasons over:**
+   * Dementia care guidelines
+   * Occupational therapy practices
+   * Nursing protocols
+   * Patient history
+5. **Personalized recommendations are generated.**
+
+### Example Scenario
+If a patient becomes agitated when reminded to take medication, the agent may identify that direct correction is escalating distress and suggest validation therapy techniques instead.
+
+### Impact
+The system helps caregivers reduce stress, improve communication, and potentially delay institutionalization while improving quality of life for dementia patients.
+
+---
+
 ## Key Features
 
 1. **Explicit 6-Agent Modular Architecture:**
@@ -92,3 +128,13 @@ npm run dev
 
 ### 3. Seed the Guidelines Database (RAG)
 When running the app for the first time, click the **"Seed RAG DB"** button in the header of the app to read `dementia_care_guidelines.md` and seed the local vector store.
+
+---
+
+## Future Work
+* ⚡ **Real-time coaching**
+* ⌚ **Wearable integration**
+* 🏥 **EHR (Electronic Health Record) integration**
+* 🔮 **Predictive behavior forecasting**
+* 🎓 **Caregiver training simulations**
+

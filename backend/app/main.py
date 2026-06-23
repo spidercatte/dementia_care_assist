@@ -123,7 +123,8 @@ def analyze_file(file: UploadFile = File(...)):
         feedback = orchestrator.analyze_file(
             file_path=temp_path,
             mime_type=file.content_type,
-            patient_profile=patient_profile
+            patient_profile=patient_profile,
+            original_filename=file.filename
         )
         return feedback
     except Exception as e:
