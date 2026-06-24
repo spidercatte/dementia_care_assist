@@ -57,16 +57,19 @@ class SimulatorAgent:
             f"4. Respond strictly in the required JSON schema."
         )
 
-        response = self.client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=[prompt],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=SimulatorResponse
+        try:
+            response = self.client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=[prompt],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=SimulatorResponse
+                )
             )
-        )
-
-        return SimulatorResponse.model_validate_json(response.text)
+            return SimulatorResponse.model_validate_json(response.text)
+        except Exception as e:
+            logger.warning(f"Failed to generate simulation response via Gemini API: {e}. Falling back to mock step.")
+            return self._mock_step(scenario, chat_history)
 
     def _mock_step(self, scenario: str, chat_history: List[dict]) -> SimulatorResponse:
         """

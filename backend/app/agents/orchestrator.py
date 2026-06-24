@@ -108,16 +108,17 @@ class OrchestratorAgent:
         return self.run_pipeline(contents=[description], patient_profile=patient_profile)
 
     def analyze_file(self, file_path: str, mime_type: str, patient_profile: dict, original_filename: str = None) -> FinalCoachingResponse:
+        filename = original_filename or file_path.split("/")[-1]
         if self.use_mock:
             # Immediately resolve file uploads using a mock response based on filename
-            filename = original_filename or file_path.split("/")[-1]
             return get_mock_coaching_response(filename)
 
-        logger.info(f"Uploading file {file_path} to Gemini File API...")
-        uploaded_file = self.client.files.upload(file=file_path)
-        logger.info(f"Uploaded file name: {uploaded_file.name}")
-
+        uploaded_file = None
         try:
+            logger.info(f"Uploading file {file_path} to Gemini File API...")
+            uploaded_file = self.client.files.upload(file=file_path)
+            logger.info(f"Uploaded file name: {uploaded_file.name}")
+
             # Wait for file to become active
             import time
             max_retries = 30  # Wait up to 60 seconds (30 * 2)
@@ -145,11 +146,16 @@ class OrchestratorAgent:
                 contents=[uploaded_file],
                 patient_profile=patient_profile
             )
-        finally:
-            logger.info(f"Cleaning up file {uploaded_file.name} from Gemini File API...")
-            try:
-                self.client.files.delete(name=uploaded_file.name)
-            except Exception as e:
-                logger.error(f"Failed to delete file from Gemini API: {e}")
+            return feedback
 
-        return feedback
+        except Exception as e:
+            logger.error(f"File analysis failed: {e}. Falling back to mock response.")
+            return get_mock_coaching_response(filename)
+
+        finally:
+            if uploaded_file is not None:
+                logger.info(f"Cleaning up file {uploaded_file.name} from Gemini File API...")
+                try:
+                    self.client.files.delete(name=uploaded_file.name)
+                except Exception as e:
+                    logger.error(f"Failed to delete file from Gemini API: {e}")

@@ -7,6 +7,15 @@ set -e
 WORKSPACE_DIR="/workspaces/dementia_care_assist"
 echo "=== Setting up DementiaCare Coach in $WORKSPACE_DIR ==="
 
+# Check if environment is already setup to skip installation
+if [ "$1" != "--force" ] && [ "$1" != "-f" ]; then
+    if [ -f "$WORKSPACE_DIR/backend/.env" ] && [ -d "$WORKSPACE_DIR/frontend/node_modules" ] && command -v poetry &>/dev/null && (cd "$WORKSPACE_DIR/backend" && poetry run python -c "import fastapi, pydantic_settings, chromadb, google.genai" &>/dev/null); then
+        echo "=== Environment already setup. Skipping dependency installation. ==="
+        echo "Use '--force' or '-f' flag to force reinstall."
+        exit 0
+    fi
+fi
+
 # 1. Setup Backend
 echo "--> Configuring Backend..."
 cd "$WORKSPACE_DIR/backend"
