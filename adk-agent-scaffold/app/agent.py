@@ -41,11 +41,11 @@ def get_patient_profile() -> str:
     """
     # Mocking the JSON database lookup for the ADK agent context
     profile = {
-        "name": "Arthur",
+        "name": "Maria",
         "dementia_type": "Alzheimer's (Moderate Stage)",
         "triggers": ["direct correction", "being rushed", "loud noises", "asking 'do you remember?'"],
-        "preferences": ["listening to 1950s big band music", "drinking chamomile tea", "talking about his past work as a carpenter"],
-        "background": "Arthur is 78 years old. He lives at home with his daughter who is his primary caregiver. He often gets confused in the late afternoon (sundowning) and can refuse medication or personal care because he believes he has to go to work or that his daughter is trying to poison him."
+        "preferences": ["listening to 1950s big band music", "drinking chamomile tea", "talking about her past work as a gardener"],
+        "background": "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the late afternoon (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her."
     }
     return json.dumps(profile, indent=2)
 

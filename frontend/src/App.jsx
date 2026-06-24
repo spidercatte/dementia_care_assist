@@ -33,30 +33,30 @@ const BACKEND_URL = 'http://localhost:8000';
 
 // Mock data fallbacks for demonstration when backend is offline
 const MOCK_PATIENT = {
-  name: "Arthur",
+  name: "Maria",
   dementia_type: "Alzheimer's (Moderate Stage)",
   triggers: ["direct correction", "being rushed", "loud noises", "asking 'do you remember?'"],
-  preferences: ["listening to 1950s big band music", "drinking chamomile tea", "talking about his past work as a carpenter"],
-  background: "Arthur is 78 years old. He lives at home with his daughter who is his primary caregiver. He often gets confused in the late afternoon (sundowning) and can refuse medication or personal care because he believes he has to go to work or that his daughter is trying to poison him."
+  preferences: ["listening to 1950s big band music", "drinking chamomile tea", "talking about her past work as a gardener"],
+  background: "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the late afternoon (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her."
 };
 
 const MOCK_ANALYSIS_MED_REFUSAL = {
   behavior_analysis: {
     patient_emotion: "agitated and suspicious",
     patient_triggers: ["direct correction ('you must take this now')", "rushing"],
-    caregiver_communication_style: "impatient, lecturing, correcting Arthur's timeline",
-    interaction_summary: "Arthur refused to take his afternoon heart medication, stating that he had already taken it and that his caregiver was trying to steal his money. The caregiver argued back, telling him he was wrong and showing him the pill bottle to 'prove' he hadn't taken it, which escalated Arthur's shouting."
+    caregiver_communication_style: "impatient, lecturing, correcting Maria's timeline",
+    interaction_summary: "Maria refused to take her afternoon heart medication, stating that she had already taken it and that her caregiver was trying to steal her money. The caregiver argued back, telling her she was wrong and showing her the pill bottle to 'prove' she hadn't taken it, which escalated Maria's shouting."
   },
   behavioral_timeline: [
     {
       timeframe: "0:00 - 0:03",
-      observable_behavior: "Rapidly repeating the filler word 'iyon, iyon, iyon' ('that, that, that') while pointing dynamically to his pockets.",
+      observable_behavior: "Rapidly repeating the filler word 'iyon, iyon, iyon' ('that, that, that') while pointing dynamically to her pockets.",
       clinical_symptom: "Perseveration & Word-Finding Difficulty",
       cognitive_state: "Mild Frustration / Desire to Communicate: Highly motivated to explain but faces vocabulary recall barrier."
     },
     {
       timeframe: "0:04 - 0:07",
-      observable_behavior: "Softens voice, slows down speech, and settles on the phrases 'ganito' ('like this') when referring to his medication.",
+      observable_behavior: "Softens voice, slows down speech, and settles on the phrases 'ganito' ('like this') when referring to her medication.",
       clinical_symptom: "Circumlocution (talking around a word)",
       cognitive_state: "Resignation / Searching for Validation: Adapting to inability to find the exact word by simplifying."
     },
@@ -64,7 +64,7 @@ const MOCK_ANALYSIS_MED_REFUSAL = {
       timeframe: "0:08 - 0:13",
       observable_behavior: "Delivers the line 'Ako rin namang anak ito...' ('I am also a child here...') with a steady, unblinking gaze.",
       clinical_symptom: "Chronological Disorientation (Identity Shifting)",
-      cognitive_state: "Vulnerability / Comfort Seeking: Placing himself in the role of a child to express need for care, safety, and direction."
+      cognitive_state: "Vulnerability / Comfort Seeking: Placing herself in the role of a child to express need for care, safety, and direction."
     }
   ],
   strengths: [
@@ -72,23 +72,23 @@ const MOCK_ANALYSIS_MED_REFUSAL = {
     "Did not touch or physically force the patient."
   ],
   opportunities_for_improvement: [
-    "Tried to use logic to 'prove' Arthur was wrong (showing the pill bottle).",
-    "Directly corrected him ('No you didn't, Dad'), which triggered defensiveness.",
+    "Tried to use logic to 'prove' Maria was wrong (showing the pill bottle).",
+    "Directly corrected her ('No you didn't, Mom'), which triggered defensiveness.",
     "Argued about the money accusation, causing further escalation."
   ],
   clinical_safety_flags: [
     "Potential cardiovascular medication omission risk. If missed repeatedly for >48 hours, contact cardiologist."
   ],
   coaching_scripts: [
-    "Avoid saying: 'Dad, you didn't take your pills! Stop lying, I have the bottle right here.'",
-    "Try saying: 'I see you're worried about these pills, Dad. They do look different today. Let's set them aside and have a cup of your favorite tea first.'",
+    "Avoid saying: 'Mom, you didn't take your pills! Stop lying, I have the bottle right here.'",
+    "Try saying: 'I see you're worried about these pills, Mom. They do look different today. Let's set them aside and have a cup of your favorite tea first.'",
     "Avoid saying: 'I'm not stealing your money, I'm your daughter!'",
-    "Try saying: 'You want to make sure your money is safe. I'll make sure everything is locked in the drawer. Let's look at your carpentry magazines.'"
+    "Try saying: 'You want to make sure your money is safe. I'll make sure everything is locked in the drawer. Let's look at your gardening magazines.'"
   ],
   recommendations: [
     {
       strategy_name: "Validation Therapy",
-      description: "Acknowledge Arthur's feeling of fear or mistrust instead of debating the facts. Say: 'You want to be sure you are safe, and I want that too.'",
+      description: "Acknowledge Maria's feeling of fear or mistrust instead of debating the facts. Say: 'You want to be sure you are safe, and I want that too.'",
       rationality: "In moderate Alzheimer's, logical proof is rejected. Validating the emotional reality (fear of poison/theft) reduces defense mechanisms."
     },
     {
@@ -103,21 +103,21 @@ const MOCK_SCENARIOS = [
   {
     id: "med_refusal",
     title: "Medication Refusal",
-    description: "Arthur refuses his heart medication, insisting he already took it and accusing you of trying to poison him.",
+    description: "Maria refuses her heart medication, insisting she already took it and accusing you of trying to poison her.",
     initial_dialogue: "I'm not taking those pills! You already gave them to me this morning. You're trying to make me sick so you can take my house!",
     initial_agitation: 6
   },
   {
     id: "shower_refusal",
     title: "Shower Agitation",
-    description: "It is late afternoon and Arthur resists taking a shower. He gets defensive and says he just showered yesterday.",
+    description: "It is late afternoon and Maria resists taking a shower. She gets defensive and says she just showered yesterday.",
     initial_dialogue: "Why are you always nagging me to wash? I took a shower yesterday! Leave me alone, I'm clean enough!",
     initial_agitation: 5
   },
   {
     id: "go_home",
     title: "Wants to 'Go Home'",
-    description: "Arthur starts packing a small bag in the living room. He is crying and saying he needs to go to his mother's house.",
+    description: "Maria starts packing a small bag in the living room. She is crying and saying she needs to go to her mother's house.",
     initial_dialogue: "Where is my suitcase? I have to go home right now. My mother is waiting for me to help with the farm chores. Let me out!",
     initial_agitation: 7
   }
@@ -525,21 +525,21 @@ function App() {
       if (inputLower.includes('must') || inputLower.includes('have to') || inputLower.includes('wrong') || inputLower.includes('doctor')) {
         responseText = "I don't care what the doctor said! You're lying to me. You want me to sleep so you can search my room. Go away!";
         deltaAgitation = 2;
-        tip = "Trap detected: Attempted to use logic/authority ('have to', 'doctor') which triggers paranoia. Try validating Arthur's mistrust.";
-      } else if (inputLower.includes('sorry') || inputLower.includes('tea') || inputLower.includes('cookies') || inputLower.includes('carpentry') || inputLower.includes('band')) {
-        responseText = "Well... I do like chamomile tea. But make sure you don't touch my papers in the living room. Where are my carpentry magazines?";
+        tip = "Trap detected: Attempted to use logic/authority ('have to', 'doctor') which triggers paranoia. Try validating Maria's mistrust.";
+      } else if (inputLower.includes('sorry') || inputLower.includes('tea') || inputLower.includes('cookies') || inputLower.includes('gardening') || inputLower.includes('band')) {
+        responseText = "Well... I do like chamomile tea. But make sure you don't touch my papers in the living room. Where are my gardening magazines?";
         deltaAgitation = -2;
-        tip = "Success: You validated his distraction or offered a preferred comfort (tea/carpentry). Agitation decreases.";
+        tip = "Success: You validated her distraction or offered a preferred comfort (tea/gardening). Agitation decreases.";
       } else {
         responseText = "Leave me alone! Why are you standing there holding that bottle? It looks toxic!";
         deltaAgitation = 0;
-        tip = "Tip: Put the pills away. Focus on validation therapy (agree with his feelings) or redirection.";
+        tip = "Tip: Put the pills away. Focus on validation therapy (agree with her feelings) or redirection.";
       }
     } else if (selectedScenario.id === 'shower_refusal') {
       if (inputLower.includes('dirty') || inputLower.includes('smell') || inputLower.includes('showered') || inputLower.includes('yesterday')) {
         responseText = "I do NOT smell! You are insulting me in my own house. I'm not going in that bathroom, it's freezing!";
         deltaAgitation = 2;
-        tip = "Trap detected: Correcting his memory ('yesterday') or accusing him of smelling triggers shame. Validate that he feels clean, or check room comfort.";
+        tip = "Trap detected: Correcting her memory ('yesterday') or accusing her of smelling triggers shame. Validate that she feels clean, or check room comfort.";
       } else if (inputLower.includes('warm') || inputLower.includes('towel') || inputLower.includes('music') || inputLower.includes('comfortable')) {
         responseText = "Warm towels? Well, it is a bit drafty in here. I suppose you can turn the heater on first. But don't rush me.";
         deltaAgitation = -1;
@@ -554,15 +554,15 @@ function App() {
       if (inputLower.includes('dead') || inputLower.includes('sold') || inputLower.includes('here') || inputLower.includes('can\'t')) {
         responseText = "No, you're wrong! My mother is waiting! Why are you keeping me locked up here? Help! Someone help me!";
         deltaAgitation = 3;
-        tip = "Critical Trap: Reality orientation (telling him his mother is dead or house is sold) triggers traumatic grief. Validate his memory instead.";
+        tip = "Critical Trap: Reality orientation (telling her her mother is dead or house is sold) triggers traumatic grief. Validate her memory instead.";
       } else if (inputLower.includes('tell me') || inputLower.includes('mother') || inputLower.includes('farm') || inputLower.includes('childhood')) {
         responseText = "My mother... she always made the best apple pies on Sundays. The farm had three horses... one was named Barnaby.";
         deltaAgitation = -2;
-        tip = "Success: Validation therapy. By asking him to share a memory about his mother/farm, you validated his emotions and can now redirect him.";
+        tip = "Success: Validation therapy. By asking her to share a memory about her mother/farm, you validated her emotions and can now redirect her.";
       } else {
         responseText = "Get out of my way, I need to walk to the bus stop. The bus comes at 5:00!";
         deltaAgitation = 1;
-        tip = "Tip: Ask about his home or childhood. Try: 'You really want to help your mom. Tell me about the chores you did.'"
+        tip = "Tip: Ask about her home or childhood. Try: 'You really want to help your mom. Tell me about the chores you did.'"
       }
     }
 
@@ -894,7 +894,7 @@ function App() {
                 <textarea
                   className="form-textarea"
                   rows={6}
-                  placeholder="Example: Dad got agitated when I showed him his heart pill. He accused me of stealing and yelled that he wouldn't take it. I showed him the medicine bottle and told him he was wrong, which made him shout louder..."
+                  placeholder="Example: Mom got agitated when I showed her her heart pill. She accused me of stealing and yelled that she wouldn't take it. I showed her the medicine bottle and told her she was wrong, which made her shout louder..."
                   value={inputText}
                   onChange={(e) => {
                     setInputText(e.target.value);
@@ -1290,7 +1290,7 @@ function App() {
                 Practice Scenarios
               </h2>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Select a scenario. The simulated patient agent (Arthur) will respond realistically. Practice validation therapy and redirection to keep his agitation low.
+                Select a scenario. The simulated patient agent (Maria) will respond realistically. Practice validation therapy and redirection to keep her agitation low.
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -1321,13 +1321,13 @@ function App() {
             <div className="glass-card simulator-panel">
               <div className="simulator-header">
                 <div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Training Chat with Arthur</h3>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Training Chat with Maria</h3>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Scenario: {selectedScenario.title}</p>
                 </div>
 
                 {/* Agitation Score Meter */}
                 <div className="agitation-meter-wrapper">
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>Arthur's Agitation:</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>Maria's Agitation:</span>
                   <span style={{ fontWeight: 800, color: simAgitation > 7 ? 'var(--color-danger)' : simAgitation > 4 ? 'var(--color-warning)' : 'var(--color-success)' }}>
                     {simAgitation}/10
                   </span>
@@ -1357,7 +1357,7 @@ function App() {
                 {isSimLoading && (
                   <div className="chat-bubble patient" style={{ opacity: 0.6 }}>
                     <RefreshCw className="spinner" size={14} style={{ display: 'inline-block', marginRight: '0.5rem' }} />
-                    Arthur is thinking...
+                    Maria is thinking...
                   </div>
                 )}
 
@@ -1376,7 +1376,7 @@ function App() {
                   type="text"
                   className="form-input"
                   style={{ flex: 1 }}
-                  placeholder="Type your response to Arthur..."
+                  placeholder="Type your response to Maria..."
                   value={simInput}
                   onChange={(e) => setSimInput(e.target.value)}
                   disabled={isSimLoading}

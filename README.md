@@ -54,8 +54,8 @@ The system helps caregivers reduce stress, improve communication, and potentiall
    * ⚠️ **Safety & Escalation Agent (`safety_escalation.py`):** Audits safety hazards (falls, wandering, medication omissions, UTI signs).
    * 🎓 **Caregiver Coaching Agent (`caregiver_coaching.py`):** Converts clinical findings into compassionate step-by-step coaching scripts ("Try saying..." vs "Avoid saying...").
 
-2. **Interactive Care Simulator (Arthur):**
-   A training sandbox where caregivers can text with a simulated patient (Arthur). Arthur's agitation level updates dynamically based on the caregiver's response patterns. Includes live coaching tips.
+2. **Interactive Care Simulator (Maria):**
+   A training sandbox where caregivers can text with a simulated patient (Maria). Maria's agitation level updates dynamically based on the caregiver's response patterns. Includes live coaching tips.
 
 3. **Externalized Guidelines & RAG Library:**
    Care guidelines are stored in `backend/data/dementia_care_guidelines.md`. The RAG pipeline parses, embeds, and indexes these guidelines directly into ChromaDB.

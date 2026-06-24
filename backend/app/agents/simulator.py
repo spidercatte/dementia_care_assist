@@ -42,7 +42,7 @@ class SimulatorAgent:
             f"If the caregiver is confrontational, uses direct correction, or argues, your agitation level should INCREASE. "
             f"If the caregiver uses validation therapy, keeps a calm tone, or redirects, your agitation level should DECREASE.\n\n"
             f"--- PATIENT PROFILE ---\n"
-            f"Name: {patient_profile.get('name', 'Arthur')}\n"
+            f"Name: {patient_profile.get('name', 'Maria')}\n"
             f"Dementia Type: {patient_profile.get('dementia_type', 'Alzheimer\'s')}\n"
             f"Key Triggers: {', '.join(patient_profile.get('triggers', ['direct correction', 'arguments']))}\n"
             f"Preferences: {', '.join(patient_profile.get('preferences', ['music', 'tea']))}\n\n"
@@ -79,7 +79,7 @@ class SimulatorAgent:
             return SimulatorResponse(
                 patient_dialogue="What do you want?",
                 patient_agitation_level=5,
-                coaching_tip="Arthur is confused. Try introducing yourself and validating his feelings."
+                coaching_tip="Maria is confused. Try introducing yourself and validating her feelings."
             )
 
         last_user_message = chat_history[-1]["content"].lower()
@@ -90,26 +90,26 @@ class SimulatorAgent:
                 return SimulatorResponse(
                     patient_dialogue="I don't care what the doctor said! You're lying to me. You want me to sleep so you can search my room. Go away!",
                     patient_agitation_level=8,
-                    coaching_tip="Trap detected: Attempted to use logic/authority which triggers paranoia. Try validating Arthur's mistrust."
+                    coaching_tip="Trap detected: Attempted to use logic/authority which triggers paranoia. Try validating Maria's mistrust."
                 )
             elif any(x in last_user_message for x in ["sorry", "tea", "cookie", "magazine", "music"]):
                 return SimulatorResponse(
-                    patient_dialogue="Well... I do like chamomile tea. But make sure you don't touch my papers in the living room. Where are my carpentry magazines?",
+                    patient_dialogue="Well... I do like chamomile tea. But make sure you don't touch my papers in the living room. Where are my gardening magazines?",
                     patient_agitation_level=4,
-                    coaching_tip="Success: You validated his distraction or offered a preferred comfort (tea/carpentry). Agitation decreases."
+                    coaching_tip="Success: You validated her distraction or offered a preferred comfort (tea/gardening). Agitation decreases."
                 )
             else:
                 return SimulatorResponse(
                     patient_dialogue="Leave me alone! Why are you standing there holding that bottle? It looks toxic!",
                     patient_agitation_level=6,
-                    coaching_tip="Tip: Put the pills away. Focus on validation therapy (agree with his feelings) or redirection."
+                    coaching_tip="Tip: Put the pills away. Focus on validation therapy (agree with her feelings) or redirection."
                 )
         elif "shower" in scenario.lower() or "bath" in scenario.lower():
             if any(x in last_user_message for x in ["dirty", "smell", "yesterday", "wash"]):
                 return SimulatorResponse(
                     patient_dialogue="I do NOT smell! You are insulting me in my own house. I'm not going in that bathroom, it's freezing!",
                     patient_agitation_level=7,
-                    coaching_tip="Trap detected: Correcting his memory ('yesterday') or accusing him of smelling triggers shame. Validate that he feels clean, or check room comfort."
+                    coaching_tip="Trap detected: Correcting her memory ('yesterday') or accusing her of smelling triggers shame. Validate that she feels clean, or check room comfort."
                 )
             elif any(x in last_user_message for x in ["warm", "towel", "music", "comfortable"]):
                 return SimulatorResponse(
@@ -129,17 +129,17 @@ class SimulatorAgent:
                 return SimulatorResponse(
                     patient_dialogue="No, you're wrong! My mother is waiting! Why are you keeping me locked up here? Help! Someone help me!",
                     patient_agitation_level=9,
-                    coaching_tip="Critical Trap: Reality orientation (telling him his mother is dead or house is sold) triggers traumatic grief. Validate his memory instead."
+                    coaching_tip="Critical Trap: Reality orientation (telling her her mother is dead or house is sold) triggers traumatic grief. Validate her memory instead."
                 )
             elif any(x in last_user_message for x in ["tell me", "mother", "farm", "childhood"]):
                 return SimulatorResponse(
                     patient_dialogue="My mother... she always made the best apple pies on Sundays. The farm had three horses... one was named Barnaby.",
                     patient_agitation_level=5,
-                    coaching_tip="Success: Validation therapy. By asking him to share a memory about his mother/farm, you validated his emotions and can now redirect him."
+                    coaching_tip="Success: Validation therapy. By asking her to share a memory about her mother/farm, you validated her emotions and can now redirect her."
                 )
             else:
                 return SimulatorResponse(
                     patient_dialogue="Get out of my way, I need to walk to the bus stop. The bus comes at 5:00!",
                     patient_agitation_level=7,
-                    coaching_tip="Tip: Ask about his home or childhood. Try: 'You really want to help your mom. Tell me about the chores you did.'"
+                    coaching_tip="Tip: Ask about her home or childhood. Try: 'You really want to help your mom. Tell me about the chores you did.'"
                 )

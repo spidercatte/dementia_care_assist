@@ -7,19 +7,19 @@ MOCK_MED_REFUSAL = FinalCoachingResponse(
     caregiver_pattern="Defensive, trying to logically prove the patient is wrong",
     risk_level="MEDIUM",
     recommended_response="Acknowledge the fear of theft/poisoning, remove the trigger (the pill bottle), and redirect to a calming sensory activity before offering the medication in a soft food like applesauce.",
-    try_saying="I see you want to make sure your money is safe, Dad. I'll lock everything in the desk drawer. Let's have a cup of warm tea first.",
+    try_saying="I see you want to make sure your money is safe, Mom. I'll lock everything in the desk drawer. Let's have a cup of warm tea first.",
     avoid_saying="You didn't take your pills! Stop saying I'm stealing, I'm your daughter and the doctor ordered these!",
-    safety_note="If cardiac medication is missed for more than 48 hours, contact his cardiologist. Ensure he does not hide pills in his mouth.",
+    safety_note="If cardiac medication is missed for more than 48 hours, contact her cardiologist. Ensure she does not hide pills in her mouth.",
     behavioral_timeline=[
         BehavioralObservation(
             timeframe="0:00 - 0:03",
-            observable_behavior="Rapidly repeating the filler word 'iyon, iyon, iyon' ('that, that, that') while pointing dynamically to his pockets.",
+            observable_behavior="Rapidly repeating the filler word 'iyon, iyon, iyon' ('that, that, that') while pointing dynamically to her pockets.",
             clinical_symptom="Perseveration & Word-Finding Difficulty",
             cognitive_state="Mild Frustration / Desire to Communicate: Highly motivated to explain but faces vocabulary recall barrier."
         ),
         BehavioralObservation(
             timeframe="0:04 - 0:07",
-            observable_behavior="Softens voice, slows down speech, and settles on the phrases 'ganito' ('like this') when referring to his medication.",
+            observable_behavior="Softens voice, slows down speech, and settles on the phrases 'ganito' ('like this') when referring to her medication.",
             clinical_symptom="Circumlocution (talking around a word)",
             cognitive_state="Resignation / Searching for Validation: Adapting to inability to find the exact word by simplifying."
         ),
@@ -27,37 +27,37 @@ MOCK_MED_REFUSAL = FinalCoachingResponse(
             timeframe="0:08 - 0:13",
             observable_behavior="Delivers the line 'Ako rin namang anak ito...' ('I am also a child here...') with a steady, unblinking gaze.",
             clinical_symptom="Chronological Disorientation (Identity Shifting)",
-            cognitive_state="Vulnerability / Comfort Seeking: Placing himself in the role of a child to express need for care, safety, and direction."
+            cognitive_state="Vulnerability / Comfort Seeking: Placing herself in the role of a child to express need for care, safety, and direction."
         )
     ],
     behavior_analysis=BehaviorRecognition(
         patient_emotion="agitated and suspicious",
         patient_triggers=["direct correction", "showing the pill bottle", "talking about doctors"],
-        caregiver_communication_style="impatient, lecturing, correcting Arthur's timeline",
-        interaction_summary="Arthur refused to take his afternoon heart medication, stating that he had already taken it and that his caregiver was trying to steal his money. The caregiver argued back, telling him he was wrong and showing him the pill bottle to 'prove' he hadn't taken it."
+        caregiver_communication_style="impatient, lecturing, correcting Maria's timeline",
+        interaction_summary="Maria refused to take her afternoon heart medication, stating that she had already taken it and that her caregiver was trying to steal her money. The caregiver argued back, telling her she was wrong and showing her the pill bottle to 'prove' she hadn't taken it."
     ),
     strengths=[
         "Caregiver kept their voice volume relatively stable initially.",
         "Did not touch or physically force the patient."
     ],
     opportunities_for_improvement=[
-        "Tried to use logic to 'prove' Arthur was wrong (showing the pill bottle).",
-        "Directly corrected him ('No you didn't, Dad'), which triggered defensiveness.",
+        "Tried to use logic to 'prove' Maria was wrong (showing the pill bottle).",
+        "Directly corrected her ('No you didn't, Mom'), which triggered defensiveness.",
         "Argued about the money accusation, causing further escalation."
     ],
     clinical_safety_flags=[
         "Potential cardiovascular medication omission risk. If missed repeatedly for >48 hours, contact cardiologist."
     ],
     coaching_scripts=[
-        "Avoid saying: 'Dad, you didn't take your pills! Stop lying, I have the bottle right here.'",
-        "Try saying: 'I see you're worried about these pills, Dad. They do look different today. Let's set them aside and have a cup of your favorite tea first.'",
+        "Avoid saying: 'Mom, you didn't take your pills! Stop lying, I have the bottle right here.'",
+        "Try saying: 'I see you're worried about these pills, Mom. They do look different today. Let's set them aside and have a cup of your favorite tea first.'",
         "Avoid saying: 'I'm not stealing your money, I'm your daughter!'",
-        "Try saying: 'You want to make sure your money is safe. I'll make sure everything is locked in the drawer. Let's look at your carpentry magazines.'"
+        "Try saying: 'You want to make sure your money is safe. I'll make sure everything is locked in the drawer. Let's look at your gardening magazines.'"
     ],
     recommendations=[
         Recommendation(
             strategy_name="Validation Therapy",
-            description="Acknowledge Arthur's feeling of fear or mistrust instead of debating the facts. Say: 'You want to be sure you are safe, and I want that too.'",
+            description="Acknowledge Maria's feeling of fear or mistrust instead of debating the facts. Say: 'You want to be sure you are safe, and I want that too.'",
             rationality="In moderate Alzheimer's, logical proof is rejected. Validating the emotional reality (fear of poison/theft) reduces defense mechanisms."
         ),
         Recommendation(
@@ -74,8 +74,8 @@ MOCK_SHOWER_RESISTANCE = FinalCoachingResponse(
     likely_trigger="Calling it a 'shower' and describing the need to get clean, highlighting memory loss",
     caregiver_pattern="Commanding, rushing, and lecturing on hygiene",
     risk_level="LOW",
-    recommended_response="Reframe the task about comfort and warmth rather than hygiene. Heat the bathroom in advance, keep a dry towel draped over his shoulders for privacy, and explain steps slowly using Teepa Snow's Positive Physical Approach.",
-    try_saying="Let's go get warmed up in the bathroom, Arthur. I have a nice warm towel waiting for you.",
+    recommended_response="Reframe the task about comfort and warmth rather than hygiene. Heat the bathroom in advance, keep a dry towel draped over her shoulders for privacy, and explain steps slowly using Teepa Snow's Positive Physical Approach.",
+    try_saying="Let's go get warmed up in the bathroom, Maria. I have a nice warm towel waiting for you.",
     avoid_saying="You need to take a shower now, you smell bad and haven't washed in three days!",
     safety_note="Ensure grab bars are installed. High risk of slips if patient becomes physically resistant on wet tile.",
     behavioral_timeline=[
@@ -87,36 +87,36 @@ MOCK_SHOWER_RESISTANCE = FinalCoachingResponse(
         ),
         BehavioralObservation(
             timeframe="0:05 - 0:08",
-            observable_behavior="Mumbles 'Yesterday... yesterday...' repeatedly while looking down and touching his shirt.",
+            observable_behavior="Mumbles 'Yesterday... yesterday...' repeatedly while looking down and touching her shirt.",
             clinical_symptom="Perseveration & Disorientation",
-            cognitive_state="Defensiveness/Shame: Believes he has already showered and feels attacked by the suggestion that he is dirty."
+            cognitive_state="Defensiveness/Shame: Believes she has already showered and feels attacked by the suggestion that she is dirty."
         ),
         BehavioralObservation(
             timeframe="0:09 - 0:12",
-            observable_behavior="Pushes caregiver's hand away when touched on the arm, voice raising as he speaks.",
+            observable_behavior="Pushes caregiver's hand away when touched on the arm, voice raising as she speaks.",
             clinical_symptom="Tactile Defensiveness & Reactive Agitation",
             cognitive_state="Fight-or-Flight Response: The sudden physical contact triggers an automatic defensive reflex."
         )
     ],
     behavior_analysis=BehaviorRecognition(
         patient_emotion="frightened and defensive",
-        patient_triggers=["calling it a 'shower'", "accusing him of smelling", "cold bathroom air"],
+        patient_triggers=["calling it a 'shower'", "accusing her of smelling", "cold bathroom air"],
         caregiver_communication_style="demanding, rushed, and using physical prompts too quickly",
-        interaction_summary="Arthur refused to go into the bathroom for his scheduled shower, arguing that he washed yesterday. The caregiver pulled his arm slightly and raised their voice, causing Arthur to push them away."
+        interaction_summary="Maria refused to go into the bathroom for her scheduled shower, arguing that she washed yesterday. The caregiver pulled her arm slightly and raised their voice, causing Maria to push them away."
     ),
     strengths=[
-        "Caregiver backed off when Arthur pushed them away, avoiding physical escalation."
+        "Caregiver backed off when Maria pushed them away, avoiding physical escalation."
     ],
     opportunities_for_improvement=[
-        "Accused Arthur of smelling, which caused defensiveness.",
-        "Attempted to pull him by the arm, creating a physical threat.",
-        "Confronted him from behind instead of initiating eye contact first."
+        "Accused Maria of smelling, which caused defensiveness.",
+        "Attempted to pull her by the arm, creating a physical threat.",
+        "Confronted her from behind instead of initiating eye contact first."
     ],
     clinical_safety_flags=[
         "Fall hazard. Patient resisting care in a wet bathroom environment has high slip risks."
     ],
     coaching_scripts=[
-        "Avoid saying: 'Come on, Arthur! You smell and you need to get clean!'",
+        "Avoid saying: 'Come on, Maria! You smell and you need to get clean!'",
         "Try saying: 'It is a bit drafty out here. Let's go get you warmed up in the bathroom. I've turned the heater on.'",
         "Avoid saying: 'No you didn't shower yesterday! Why do you keep lying?'",
         "Try saying: 'You like feeling clean and fresh. I do too. Let's go get a warm wash cloth.'"
@@ -124,7 +124,7 @@ MOCK_SHOWER_RESISTANCE = FinalCoachingResponse(
     recommendations=[
         Recommendation(
             strategy_name="Positive Physical Approach (Teepa Snow)",
-            description="Approach Arthur from the front, make eye contact, offer a handshake to slide into hand-under-hand grip, and stand at his side. Walk with him rather than pulling him.",
+            description="Approach Maria from the front, make eye contact, offer a handshake to slide into hand-under-hand grip, and stand at her side. Walk with her rather than pulling her.",
             rationality="Approaching from the front prevents startle responses, and standing at the side is supportive rather than confrontational."
         ),
         Recommendation(
@@ -138,12 +138,12 @@ MOCK_SHOWER_RESISTANCE = FinalCoachingResponse(
 # Mock response for Wandering / Wants to go home
 MOCK_WANDERING = FinalCoachingResponse(
     observed_behavior="Wandering & Wanting to Go Home",
-    likely_trigger="Late-afternoon confusion (sundowning) combined with memory loss of his current house",
-    caregiver_pattern="Reality orientation (trying to explain his parents are dead and house was sold)",
+    likely_trigger="Late-afternoon confusion (sundowning) combined with memory loss of her current house",
+    caregiver_pattern="Reality orientation (trying to explain her parents are dead and house was sold)",
     risk_level="HIGH",
-    recommended_response="Validate the desire to help his mother or go home. Ask him questions about his childhood home and farm chores to let him share memories, then redirect him to a domestic helper task like folding laundry or drinking tea.",
-    try_saying="You want to make sure your mom is taken care of, Arthur. She is so lucky to have you. What kind of chores did you do on the farm?",
-    avoid_saying="Arthur, your mom died twenty years ago! You live here with me now, your old house was sold!",
+    recommended_response="Validate the desire to help her mother or go home. Ask her questions about her childhood home and farm chores to let her share memories, then redirect her to a domestic helper task like folding laundry or drinking tea.",
+    try_saying="You want to make sure your mom is taken care of, Maria. She is so lucky to have you. What kind of chores did you do on the farm?",
+    avoid_saying="Maria, your mom died twenty years ago! You live here with me now, your old house was sold!",
     safety_note="Wandering risk is elevated. Install slide locks out of direct eye-line on exit doors, or use exit sensor mats.",
     behavioral_timeline=[
         BehavioralObservation(
@@ -156,11 +156,11 @@ MOCK_WANDERING = FinalCoachingResponse(
             timeframe="0:04 - 0:07",
             observable_behavior="Pulls a suitcase, tearfully repeating 'My mother is waiting... she needs help on the farm.'",
             clinical_symptom="Chronological Disorientation & Past Role Reliving",
-            cognitive_state="Sense of Duty/Regression: Living in a cognitive state of decades past, driven by the strong emotional obligation to his parents."
+            cognitive_state="Sense of Duty/Regression: Living in a cognitive state of decades past, driven by the strong emotional obligation to her parents."
         ),
         BehavioralObservation(
             timeframe="0:08 - 0:12",
-            observable_behavior="Screams and tries to open the door when told his mother is dead, breathing heavily.",
+            observable_behavior="Screams and tries to open the door when told her mother is dead, breathing heavily.",
             clinical_symptom="Catastrophic Reaction",
             cognitive_state="Acute Grief/Panic: Hearing the reality orientation feels like receiving news of a fresh, sudden tragedy."
         )
@@ -168,21 +168,21 @@ MOCK_WANDERING = FinalCoachingResponse(
     behavior_analysis=BehaviorRecognition(
         patient_emotion="grieving, anxious, and determined",
         patient_triggers=["sundowning shadows", "feeling trapped", "memory of farm chores"],
-        caregiver_communication_style="rationalizing, corrective, stating historical facts that distress him",
-        interaction_summary="Arthur packed a bag at 4:30 PM, crying and stating he had to walk to his mother's farm to do the chores. The caregiver told him his mother was dead, which caused Arthur to scream and try to open the front lock."
+        caregiver_communication_style="rationalizing, corrective, stating historical facts that distress her",
+        interaction_summary="Maria packed a bag at 4:30 PM, crying and stating she had to walk to her mother's farm to do the chores. The caregiver told her her mother was dead, which caused Maria to scream and try to open the front lock."
     ),
     strengths=[
         "Caregiver locked the door in advance to prevent elopement."
     ],
     opportunities_for_improvement=[
-        "Used harsh reality orientation (stating his mother was dead), causing acute grief.",
-        "Argued about the location, which increased his panic."
+        "Used harsh reality orientation (stating her mother was dead), causing acute grief.",
+        "Argued about the location, which increased her panic."
     ],
     clinical_safety_flags=[
         "High elopement and wandering risk, particularly between 4:00 PM and 7:00 PM (sundowning)."
     ],
     coaching_scripts=[
-        "Avoid saying: 'Dad, your mother is dead! She died a long time ago!'",
+        "Avoid saying: 'Mom, your mother is dead! She died a long time ago!'",
         "Try saying: 'You really care about helping your mom. She was a wonderful cook, wasn't she? Tell me about the farm.'",
         "Avoid saying: 'You can't go out, it's dark and you don't live there anymore.'",
         "Try saying: 'The bus isn't coming for a while. Let's sit down and have some tea while we fold these towels. Your mom always liked a clean house.'"
@@ -190,7 +190,7 @@ MOCK_WANDERING = FinalCoachingResponse(
     recommendations=[
         Recommendation(
             strategy_name="Validation & Nostalgia Therapy",
-            description="Do not argue about the timeline. Validate his feelings about wanting to be helpful to his mother. Prompt him to share details of his past carpentry or farm work.",
+            description="Do not argue about the timeline. Validate her feelings about wanting to be helpful to her mother. Prompt her to share details of her past gardening or farm work.",
             rationality="Entering their reality preserves dignity and redirects their anxiety into pleasant reminiscence, which naturally lowers cortisol."
         ),
         Recommendation(
