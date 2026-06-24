@@ -96,7 +96,8 @@ const MOCK_ANALYSIS_MED_REFUSAL = {
       description: "Put the medication bottle away immediately. Suggest a comforting routine like making chamomile tea or playing 1950s big band music, then offer the pills again in 20-30 minutes mixed in a snack (e.g. applesauce).",
       rationality: "Short-term memory lapses allow the patient to forget the previous conflict, and pairing with a preferred activity shifts their emotional valence."
     }
-  ]
+  ],
+  detected_language: "Tagalog"
 };
 
 const MOCK_SCENARIOS = [
@@ -157,6 +158,12 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisStep, setAnalysisStep] = useState(0); // 0: Idle, 1: Interaction Analysis, 2: Context Evaluation, 3: Guideline RAG, 4: Safety Assessment, 5: Coaching Synthesis
+  const [analysisSourceType, setAnalysisSourceType] = useState(null); // 'file' or 'text'
+
+  // Translation State
+  const [translationLanguage, setTranslationLanguage] = useState('original');
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translatedResult, setTranslatedResult] = useState(null);
 
   // Live Recording & Preview State
   const [fileUrl, setFileUrl] = useState(null);
@@ -405,8 +412,12 @@ function App() {
 
   const handleAnalyze = async () => {
     if (!inputText.trim() && !selectedFile) return;
+    const wasFileUploaded = !!selectedFile;
     setIsAnalyzing(true);
     setAnalysisResult(null);
+    setAnalysisSourceType(null);
+    setTranslationLanguage('original');
+    setTranslatedResult(null);
 
     // 5-Agent Pipeline Visual Indicator Sequence
     simulateStepLoading(1, () => { // Interaction Analysis
@@ -435,18 +446,22 @@ function App() {
                   if (res.ok) {
                     const data = await res.json();
                     setAnalysisResult(data);
+                    setAnalysisSourceType(wasFileUploaded ? 'file' : 'text');
                   } else {
                     const err = await res.json();
                     alert('Error from API: ' + (err.detail || 'Unknown error'));
                     setAnalysisResult(MOCK_ANALYSIS_MED_REFUSAL); // Fallback on failure
+                    setAnalysisSourceType(wasFileUploaded ? 'file' : 'text');
                   }
                 } catch (e) {
                   alert('Connection error, using mock data: ' + e.message);
                   setAnalysisResult(MOCK_ANALYSIS_MED_REFUSAL);
+                  setAnalysisSourceType(wasFileUploaded ? 'file' : 'text');
                 }
               } else {
                 // Offline Mock Mode
                 setAnalysisResult(MOCK_ANALYSIS_MED_REFUSAL);
+                setAnalysisSourceType(wasFileUploaded ? 'file' : 'text');
               }
               setIsAnalyzing(false);
               setAnalysisStep(0);
@@ -455,6 +470,131 @@ function App() {
         });
       });
     });
+  };
+
+  const getMockTranslation = (result, lang) => {
+    if (!result) return null;
+
+    // Select translation mapping
+    let translated = { ...result };
+
+    // Pre-baked mappings for high-fidelity testing
+    const tlMap = {
+      "Medication Refusal & Theft Paranoia": "Pagtanggi sa Gamot at Paranoia sa Pagnanakaw",
+      "Direct correction and rushing the medication schedule": "Direktang pagwawasto at pagmamadali sa iskedyul ng gamot",
+      "Defensive, trying to logically prove the patient is wrong": "Depensibo, sinusubukang patunayan sa lohikal na paraan na mali ang pasyente",
+      "Acknowledge the fear of theft/poisoning, remove the trigger (the pill bottle), and redirect to a calming sensory activity before offering the medication in a soft food like applesauce.": "Tukuyin ang takot sa pagnanakaw o pagkalason, alisin ang bote ng gamot, at ibaling ang pansin sa isang nakakalma na aktibidad bago ibigay ang gamot sa malambot na pagkain tulad ng applesauce.",
+      "I see you want to make sure your money is safe, Mom. I'll lock everything in the desk drawer. Let's have a cup of warm tea first.": "Nakikita ko na gusto mong siguraduhing ligtas ang pera mo, Nanay. Ila-lock ko ang lahat sa drawer ng mesa. Uminom muna tayo ng mainit na tsa.",
+      "You didn't take your pills! Stop saying I'm stealing, I'm your daughter and the doctor ordered these!": "Hindi mo ininom ang mga pill mo! Ihinto mo ang pagsasabi na nagnanakaw ako, ako ang anak mo at iniutos ito ng doktor!",
+      "If cardiac medication is missed for more than 48 hours, contact her cardiologist. Ensure she does not hide pills in her mouth.": "Kung lumaktaw ang gamot sa puso ng higit sa 48 oras, makipag-ugnayan sa cardiologist. Siguraduhing hindi niya itinatago ang mga tableta sa kanyang bibig.",
+      "Validation Therapy": "Validation Therapy",
+      "Redirection and Pacing": "Redirection at Pacing"
+    };
+
+    const esMap = {
+      "Medication Refusal & Theft Paranoia": "Rechazo de medicamentos y paranoia de robo",
+      "Direct correction and rushing the medication schedule": "Corrección directa y apresurar el horario de medicamentos",
+      "Defensive, trying to logically prove the patient is wrong": "Defensivo, tratando de probar lógicamente que el paciente está equivocado",
+      "Acknowledge the fear of theft/poisoning, remove the trigger (the pill bottle), and redirect to a calming sensory activity before offering the medication in a soft food like applesauce.": "Reconozca el temor al robo/envenenamiento, retire el desencadenante (el frasco de pastillas) y redirija a una actividad sensorial relajante antes de ofrecer el medicamento en un alimento suave como puré de manzana.",
+      "I see you want to make sure your money is safe, Mom. I'll lock everything in the desk drawer. Let's have a cup of warm tea first.": "Veo que quieres asegurarte de que tu dinero esté seguro, mamá. Guardaré todo en el cajón del escritorio. Tomemos una taza de té caliente primero.",
+      "You didn't take your pills! Stop saying I'm stealing, I'm your daughter and the doctor ordered these!": "¡No te tomaste tus pastillas! Deja de decir que estoy robando, ¡soy tu hija y el doctor ordenó esto!",
+      "If cardiac medication is missed for more than 48 hours, contact her cardiologist. Ensure she does not hide pills in her mouth.": "Si se olvida el medicamento cardíaco por más de 48 horas, comuníquese con su cardiólogo. Asegúrese de que no esconda pastillas en la boca.",
+      "Validation Therapy": "Terapia de Validación",
+      "Redirection and Pacing": "Redirección y Ritmo"
+    };
+
+    const map = lang === 'Spanish' ? esMap : lang === 'Tagalog' ? tlMap : {};
+    const tag = lang === 'Spanish' ? '[ES]' : lang === 'Tagalog' ? '[TL]' : '[EN]';
+
+    const translateText = (text) => {
+      if (typeof text !== 'string') return text;
+      const cleaned = text.trim();
+      if (map[cleaned]) return map[cleaned];
+      for (const [en, trans] of Object.entries(map)) {
+        if (text.includes(en)) return text.replace(en, trans);
+      }
+      return `${tag} ${text}`;
+    };
+
+    const copy = JSON.parse(JSON.stringify(result));
+    copy.observed_behavior = translateText(copy.observed_behavior);
+    copy.likely_trigger = translateText(copy.likely_trigger);
+    copy.caregiver_pattern = translateText(copy.caregiver_pattern);
+    copy.recommended_response = translateText(copy.recommended_response);
+    copy.try_saying = translateText(copy.try_saying);
+    copy.avoid_saying = translateText(copy.avoid_saying);
+    copy.safety_note = translateText(copy.safety_note);
+
+    if (copy.strengths) copy.strengths = copy.strengths.map(translateText);
+    if (copy.opportunities_for_improvement) copy.opportunities_for_improvement = copy.opportunities_for_improvement.map(translateText);
+    if (copy.clinical_safety_flags) copy.clinical_safety_flags = copy.clinical_safety_flags.map(translateText);
+    if (copy.coaching_scripts) copy.coaching_scripts = copy.coaching_scripts.map(translateText);
+
+    if (copy.behavior_analysis) {
+      copy.behavior_analysis.patient_emotion = translateText(copy.behavior_analysis.patient_emotion);
+      copy.behavior_analysis.caregiver_communication_style = translateText(copy.behavior_analysis.caregiver_communication_style);
+      copy.behavior_analysis.interaction_summary = translateText(copy.behavior_analysis.interaction_summary);
+      if (copy.behavior_analysis.patient_triggers) {
+        copy.behavior_analysis.patient_triggers = copy.behavior_analysis.patient_triggers.map(translateText);
+      }
+    }
+
+    if (copy.behavioral_timeline) {
+      copy.behavioral_timeline.forEach(obs => {
+        obs.observable_behavior = translateText(obs.observable_behavior);
+        obs.clinical_symptom = translateText(obs.clinical_symptom);
+        obs.cognitive_state = translateText(obs.cognitive_state);
+      });
+    }
+
+    if (copy.recommendations) {
+      copy.recommendations.forEach(rec => {
+        rec.strategy_name = translateText(rec.strategy_name);
+        rec.description = translateText(rec.description);
+        rec.rationality = translateText(rec.rationality);
+      });
+    }
+
+    return copy;
+  };
+
+  const handleTranslate = async (lang) => {
+    setTranslationLanguage(lang);
+    if (lang === 'original') {
+      setTranslatedResult(null);
+      return;
+    }
+    setIsTranslating(true);
+    try {
+      if (backendStatus === 'online') {
+        const res = await fetch(`${BACKEND_URL}/translate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            coaching_response: analysisResult,
+            target_language: lang
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setTranslatedResult(data);
+        } else {
+          alert('Failed to translate');
+          setTranslationLanguage('original');
+          setTranslatedResult(null);
+        }
+      } else {
+        const translated = getMockTranslation(analysisResult, lang);
+        setTranslatedResult(translated);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Translation failed');
+      setTranslationLanguage('original');
+      setTranslatedResult(null);
+    } finally {
+      setIsTranslating(false);
+    }
   };
 
   // ----------------------------------------------------
@@ -651,6 +791,8 @@ function App() {
       }
     ]);
   };
+
+  const displayResult = translatedResult || analysisResult;
 
   return (
     <div className="app-container">
@@ -977,188 +1119,248 @@ function App() {
                 </div>
               )}
 
-              {analysisResult && !isAnalyzing && (
-                <div className="feedback-grid fade-in">
-
-                  {/* Summary & Behavior Recognition */}
-                  <div className="glass-card feedback-full-width" style={{ background: 'var(--card-inner-bg)', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="api-status" style={{ background: 'var(--primary-glow)', border: '1px solid var(--primary)' }}>
-                        <Smile size={14} style={{ color: 'var(--primary)' }} />
-                        <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Behavioral Analysis</span>
+              {displayResult && !isAnalyzing && (
+                <>
+                  {/* Language Detection & Translation Bar */}
+                  <div className="language-translation-bar" style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '0.75rem 1rem',
+                    marginBottom: '1rem',
+                    background: 'var(--card-inner-bg)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    flexWrap: 'wrap',
+                    gap: '0.75rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Detected Language:</span>
+                      <span className="language-badge" style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        background: displayResult.detected_language && displayResult.detected_language !== 'English' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(6, 182, 212, 0.08)',
+                        border: `1px solid ${displayResult.detected_language && displayResult.detected_language !== 'English' ? '#ef4444' : 'var(--primary)'}`,
+                        color: displayResult.detected_language && displayResult.detected_language !== 'English' ? '#ef4444' : 'var(--primary)',
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: '20px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600
+                      }}>
+                        <Volume2 size={12} />
+                        {displayResult.detected_language || 'English'}
                       </span>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Patient Emotion: <strong>{analysisResult.behavior_analysis.patient_emotion}</strong></span>
                     </div>
-                    <p style={{ fontSize: '0.95rem', fontStyle: 'italic', color: 'var(--text-light)' }}>
-                      "{analysisResult.behavior_analysis.interaction_summary}"
-                    </p>
 
-                    <div className="analysis-score-container" style={{ marginTop: '0.5rem' }}>
-                      <div className="score-box">
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Patient Triggers</p>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', marginTop: '0.35rem' }}>
-                          {analysisResult.behavior_analysis.patient_triggers.map((t, idx) => (
-                            <span key={idx} className="tag-pill" style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>{t}</span>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="score-box">
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Caregiver Style</p>
-                        <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--primary)', marginTop: '0.35rem' }}>
-                          {analysisResult.behavior_analysis.caregiver_communication_style}
-                        </p>
-                      </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Translate Feedback:</span>
+                      <select
+                        value={translationLanguage}
+                        onChange={(e) => handleTranslate(e.target.value)}
+                        disabled={isTranslating}
+                        style={{
+                          background: 'var(--bg-card)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-main)',
+                          borderRadius: '8px',
+                          padding: '0.3rem 0.6rem',
+                          fontSize: '0.85rem',
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                          outline: 'none'
+                        }}
+                      >
+                        <option value="original">Original</option>
+                        <option value="English">English</option>
+                        <option value="Spanish">Spanish (Español)</option>
+                        <option value="Tagalog">Tagalog (Filipino)</option>
+                      </select>
+                      {isTranslating && <RefreshCw size={14} className="spinner" style={{ color: 'var(--primary)' }} />}
                     </div>
                   </div>
 
-                  {/* Safety / Escalation Flags */}
-                  {analysisResult.clinical_safety_flags && analysisResult.clinical_safety_flags.length > 0 && (
-                    <div className="feedback-full-width alert-box danger">
-                      <AlertTriangle size={24} style={{ flexShrink: 0 }} />
-                      <div>
-                        <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>CRITICAL CLINICAL & SAFETY ALERTS</p>
-                        <ul style={{ paddingLeft: '1.2rem', marginTop: '0.25rem', fontSize: '0.85rem' }}>
-                          {analysisResult.clinical_safety_flags.map((flag, idx) => (
-                            <li key={idx}>{flag}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  )}
+                  <div className="feedback-grid fade-in">
 
-                  {/* Clinical Behavioral Timeline (Behavioral Coding Worksheet) */}
-                  {analysisResult.behavioral_timeline && analysisResult.behavioral_timeline.length > 0 && (
-                    <div className="glass-card feedback-full-width" style={{ background: 'var(--card-inner-bg)', gap: '1rem', border: '1px solid var(--border-color)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <Activity size={18} style={{ color: 'var(--primary)' }} />
-                        <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
-                          Clinical Behavioral Timeline
-                        </h3>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--primary)', marginLeft: 'auto', background: 'var(--primary-glow)', border: '1px solid var(--primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
-                          Behavioral Coding Worksheet
+                    {/* Summary & Behavior Recognition */}
+                    <div className="glass-card feedback-full-width" style={{ background: 'var(--card-inner-bg)', gap: '0.75rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="api-status" style={{ background: 'var(--primary-glow)', border: '1px solid var(--primary)' }}>
+                          <Smile size={14} style={{ color: 'var(--primary)' }} />
+                          <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Behavioral Analysis</span>
                         </span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Patient Emotion: <strong>{displayResult.behavior_analysis.patient_emotion}</strong></span>
                       </div>
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        Chronological mapping of specific timeframes to observable patient behaviors, clinical symptoms, and underlying cognitive or emotional states.
+                      <p style={{ fontSize: '0.95rem', fontStyle: 'italic', color: 'var(--text-light)' }}>
+                        "{displayResult.behavior_analysis.interaction_summary}"
                       </p>
-                      <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
-                        <table className="timeline-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-                          <thead>
-                            <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
-                              <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600, width: '120px' }}>Timeframe</th>
-                              <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>Observable Behavior / Speech</th>
-                              <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600, width: '220px' }}>Clinical Symptom Term</th>
-                              <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>Underlying Emotion / Cognitive State</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {analysisResult.behavioral_timeline.map((obs, idx) => (
-                              <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)', verticalAlign: 'top' }}>
-                                <td style={{ padding: '0.8rem' }}>
-                                  <span className="tag-pill" style={{ background: 'var(--primary-glow)', border: '1px solid var(--primary)', color: 'var(--primary)', fontWeight: 600, display: 'inline-block', fontSize: '0.8rem' }}>
-                                    {obs.timeframe}
-                                  </span>
-                                </td>
-                                <td style={{ padding: '0.8rem', color: 'var(--text-light)', lineHeight: '1.4' }}>
-                                  {obs.observable_behavior}
-                                </td>
-                                <td style={{ padding: '0.8rem' }}>
-                                  <span style={{
-                                    background: 'var(--symptom-tag-bg)',
-                                    border: '1px solid var(--symptom-tag-border)',
-                                    color: 'var(--symptom-tag-color)',
-                                    fontSize: '0.8rem',
-                                    padding: '0.15rem 0.4rem',
-                                    borderRadius: '4px',
-                                    fontWeight: 500,
-                                    display: 'inline-block'
-                                  }}>
-                                    {obs.clinical_symptom}
-                                  </span>
-                                </td>
-                                <td style={{ padding: '0.8rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', lineHeight: '1.4' }}>
-                                  {obs.cognitive_state}
-                                </td>
-                              </tr>
+
+                      <div className="analysis-score-container" style={{ marginTop: '0.5rem' }}>
+                        <div className="score-box">
+                          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Patient Triggers</p>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', marginTop: '0.35rem' }}>
+                            {displayResult.behavior_analysis.patient_triggers.map((t, idx) => (
+                              <span key={idx} className="tag-pill" style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>{t}</span>
                             ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Strengths */}
-                  <div className="glass-card" style={{ gap: '0.75rem' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-success)' }}>
-                      <ThumbsUp size={16} />
-                      Caregiver Strengths
-                    </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      {analysisResult.strengths.map((str, idx) => (
-                        <div key={idx} className="check-item success">
-                          <CheckCircle2 size={16} />
-                          <span>{str}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Opportunities */}
-                  <div className="glass-card" style={{ gap: '0.75rem' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-warning)' }}>
-                      <AlertTriangle size={16} />
-                      Opportunities to Improve
-                    </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      {analysisResult.opportunities_for_improvement.map((opp, idx) => (
-                        <div key={idx} className="check-item opportunity">
-                          <AlertTriangle size={16} />
-                          <span>{opp}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Dialogue Coaching Scripts */}
-                  <div className="glass-card feedback-full-width" style={{ gap: '0.75rem' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--secondary)' }}>
-                      <MessageSquare size={16} />
-                      Recommended Dialogue Scripts (What to say)
-                    </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
-                      {/* We chunk scripts into pairs */}
-                      {analysisResult.coaching_scripts.map((script, idx) => {
-                        const isAvoid = script.startsWith("Avoid saying:");
-                        return (
-                          <div key={idx} className={`dialogue-line ${isAvoid ? 'avoid' : 'try'}`}>
-                            <strong>{isAvoid ? 'AVOID:' : 'TRY SAYING:'}</strong> {script.replace("Avoid saying:", "").replace("Try saying:", "")}
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Clinical Recommendations */}
-                  <div className="feedback-full-width" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                      Clinical Care Protocols
-                    </h3>
-
-                    {analysisResult.recommendations.map((rec, idx) => (
-                      <div key={idx} className="glass-card" style={{ background: 'var(--secondary-glow-bg)', border: '1px solid var(--secondary-glow-border)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 700, color: 'var(--secondary)' }}>{rec.strategy_name}</span>
-                          <span className="api-status" style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}>Grounded Advice</span>
                         </div>
-                        <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>{rec.description}</p>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
-                          <strong>Why this works:</strong> {rec.rationality}
-                        </p>
+                        <div className="score-box">
+                          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Caregiver Style</p>
+                          <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--primary)', marginTop: '0.35rem' }}>
+                            {displayResult.behavior_analysis.caregiver_communication_style}
+                          </p>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
 
-                </div>
+                    {/* Safety / Escalation Flags */}
+                    {displayResult.clinical_safety_flags && displayResult.clinical_safety_flags.length > 0 && (
+                      <div className="feedback-full-width alert-box danger">
+                        <AlertTriangle size={24} style={{ flexShrink: 0 }} />
+                        <div>
+                          <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>CRITICAL CLINICAL & SAFETY ALERTS</p>
+                          <ul style={{ paddingLeft: '1.2rem', marginTop: '0.25rem', fontSize: '0.85rem' }}>
+                            {displayResult.clinical_safety_flags.map((flag, idx) => (
+                              <li key={idx}>{flag}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Clinical Behavioral Timeline (Behavioral Coding Worksheet) */}
+                    {analysisSourceType === 'file' && displayResult.behavioral_timeline && displayResult.behavioral_timeline.length > 0 && (
+                      <div className="glass-card feedback-full-width" style={{ background: 'var(--card-inner-bg)', gap: '1rem', border: '1px solid var(--border-color)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <Activity size={18} style={{ color: 'var(--primary)' }} />
+                          <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                            Clinical Behavioral Timeline
+                          </h3>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--primary)', marginLeft: 'auto', background: 'var(--primary-glow)', border: '1px solid var(--primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
+                            Behavioral Coding Worksheet
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                          Chronological mapping of specific timeframes to observable patient behaviors, clinical symptoms, and underlying cognitive or emotional states.
+                        </p>
+                        <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
+                          <table className="timeline-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                                <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600, width: '120px' }}>Timeframe</th>
+                                <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>Observable Behavior / Speech</th>
+                                <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600, width: '220px' }}>Clinical Symptom Term</th>
+                                <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>Underlying Emotion / Cognitive State</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {displayResult.behavioral_timeline.map((obs, idx) => (
+                                <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)', verticalAlign: 'top' }}>
+                                  <td style={{ padding: '0.8rem' }}>
+                                    <span className="tag-pill" style={{ background: 'var(--primary-glow)', border: '1px solid var(--primary)', color: 'var(--primary)', fontWeight: 600, display: 'inline-block', fontSize: '0.8rem' }}>
+                                      {obs.timeframe}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '0.8rem', color: 'var(--text-light)', lineHeight: '1.4' }}>
+                                    {obs.observable_behavior}
+                                  </td>
+                                  <td style={{ padding: '0.8rem' }}>
+                                    <span style={{
+                                      background: 'var(--symptom-tag-bg)',
+                                      border: '1px solid var(--symptom-tag-border)',
+                                      color: 'var(--symptom-tag-color)',
+                                      fontSize: '0.8rem',
+                                      padding: '0.15rem 0.4rem',
+                                      borderRadius: '4px',
+                                      fontWeight: 500,
+                                      display: 'inline-block'
+                                    }}>
+                                      {obs.clinical_symptom}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '0.8rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', lineHeight: '1.4' }}>
+                                    {obs.cognitive_state}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Strengths */}
+                    <div className="glass-card" style={{ gap: '0.75rem' }}>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-success)' }}>
+                        <ThumbsUp size={16} />
+                        Caregiver Strengths
+                      </h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {displayResult.strengths.map((str, idx) => (
+                          <div key={idx} className="check-item success">
+                            <CheckCircle2 size={16} />
+                            <span>{str}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Opportunities */}
+                    <div className="glass-card" style={{ gap: '0.75rem' }}>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-warning)' }}>
+                        <AlertTriangle size={16} />
+                        Opportunities to Improve
+                      </h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {displayResult.opportunities_for_improvement.map((opp, idx) => (
+                          <div key={idx} className="check-item opportunity">
+                            <AlertTriangle size={16} />
+                            <span>{opp}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Dialogue Coaching Scripts */}
+                    <div className="glass-card feedback-full-width" style={{ gap: '0.75rem' }}>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--secondary)' }}>
+                        <MessageSquare size={16} />
+                        Recommended Dialogue Scripts (What to say)
+                      </h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+                        {displayResult.coaching_scripts.map((script, idx) => {
+                          const isAvoid = script.startsWith("Avoid saying:");
+                          return (
+                            <div key={idx} className={`dialogue-line ${isAvoid ? 'avoid' : 'try'}`}>
+                              <strong>{isAvoid ? 'AVOID:' : 'TRY SAYING:'}</strong> {script.replace("Avoid saying:", "").replace("Try saying:", "")}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Clinical Recommendations */}
+                    <div className="feedback-full-width" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 600, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                        Clinical Care Protocols
+                      </h3>
+
+                      {displayResult.recommendations.map((rec, idx) => (
+                        <div key={idx} className="glass-card" style={{ background: 'var(--secondary-glow-bg)', border: '1px solid var(--secondary-glow-border)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 700, color: 'var(--secondary)' }}>{rec.strategy_name}</span>
+                            <span className="api-status" style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}>Grounded Advice</span>
+                          </div>
+                          <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>{rec.description}</p>
+                          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
+                            <strong>Why this works:</strong> {rec.rationality}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                  </div>
+                </>
               )}
             </div>
           </div>

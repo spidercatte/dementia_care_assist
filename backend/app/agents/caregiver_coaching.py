@@ -38,6 +38,7 @@ class CaregiverCoachingAgent:
             f"Agitation: {analysis.agitation_level}/10 | Confusion: {analysis.confusion_level}/10\n"
             f"Verbal Summary: {analysis.verbal_transcript_summary}\n"
             f"Non-verbal Cues: {analysis.non_verbal_cues}\n"
+            f"Detected Language: {analysis.detected_language}\n"
             f"Clinical Timeline:\n{timeline_text}\n\n"
             f"--- CLINICAL GUIDANCE ---\n"
             f"Advice: {guidance.recommended_response}\n"
@@ -54,7 +55,8 @@ class CaregiverCoachingAgent:
             f"4. Populate the 'recommendations' list with concrete method cards (e.g. Validation Therapy, Redirection) detailing the description and clinical rationality.\n"
             f"5. Map the outputs to matching fields: behavior_analysis, strengths, opportunities_for_improvement, clinical_safety_flags.\n"
             f"6. Populate the 'behavioral_timeline' field with the timestamped observations provided.\n"
-            f"7. Respond strictly in the required JSON schema."
+            f"7. Populate the 'detected_language' field with the detected language provided in the input: '{analysis.detected_language}'.\n"
+            f"8. Respond strictly in the required JSON schema."
         )
 
         response = self.client.models.generate_content(

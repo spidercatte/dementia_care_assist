@@ -7,11 +7,13 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from google.genai import types
 from app.config import settings
-from app.schemas import FinalCoachingResponse
+from app.schemas import FinalCoachingResponse, TranslationRequest
 from app.agents.orchestrator import OrchestratorAgent
 from app.agents.simulator import SimulatorAgent, SimulatorResponse
 from app.rag import seed_default_guidelines
+from app.mock_responses import get_mock_translation
 
 app = FastAPI(title=settings.app_name)
 
@@ -139,6 +141,33 @@ def analyze_file(file: UploadFile = File(...)):
                 os.remove(temp_path)
             except Exception:
                 pass
+
+@app.post("/translate", response_model=FinalCoachingResponse)
+def translate_feedback(request: TranslationRequest):
+    if orchestrator.use_mock or not orchestrator.client:
+        return get_mock_translation(request.coaching_response, request.target_language)
+
+    try:
+        response_json = request.coaching_response.model_dump_json()
+        prompt = (
+            f"You are an expert medical translator specializing in dementia care counseling.\n"
+            f"Translate all user-facing text values in the following JSON object to '{request.target_language}'.\n"
+            f"Do not translate JSON keys, timestamps, agitation/confusion levels, risk levels, or other technical values.\n"
+            f"Make sure to translate recommendations, descriptions, timelines, try_saying, avoid_saying, clinical advice, strengths, and opportunities.\n"
+            f"Maintain the exact same JSON schema and structure. Output strictly the translated JSON matching the schema.\n\n"
+            f"JSON object to translate:\n{response_json}"
+        )
+        response = orchestrator.client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=[prompt],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=FinalCoachingResponse
+            )
+        )
+        return FinalCoachingResponse.model_validate_json(response.text)
+    except Exception as e:
+        return get_mock_translation(request.coaching_response, request.target_language)
 
 @app.post("/simulator/step", response_model=SimulatorResponse)
 def simulator_step(request: SimulatorRequest):

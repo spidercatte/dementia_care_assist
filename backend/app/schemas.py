@@ -20,6 +20,7 @@ class InteractionAnalysisResponse(BaseModel):
     non_verbal_cues: str = Field(description="Observed non-verbal cues (pacing, tone, posture, expressions)")
     rag_query: str = Field(description="2-3 keywords to search for care guidelines (e.g., 'medication refusal', 'shower resistance')")
     behavioral_timeline: List[BehavioralObservation] = Field(description="Chronological timeline of behavioral observations")
+    detected_language: str = Field(description="The language used in the interaction, e.g., 'English', 'Tagalog', 'Spanish', etc.")
 
 # ==========================================
 # 2. Patient Context Agent Schema
@@ -79,3 +80,11 @@ class FinalCoachingResponse(BaseModel):
     clinical_safety_flags: List[str] = Field(description="List of clinical safety warnings")
     coaching_scripts: List[str] = Field(description="Dialogue pairs ('Avoid: ...', 'Try: ...')")
     recommendations: List[Recommendation] = Field(description="List of detailed recommendation cards")
+    detected_language: str = Field(description="The language detected in the input interaction, e.g., 'English', 'Tagalog', 'Spanish', etc.")
+
+# ==========================================
+# 6. Translation Request Schema
+# ==========================================
+class TranslationRequest(BaseModel):
+    coaching_response: FinalCoachingResponse
+    target_language: str

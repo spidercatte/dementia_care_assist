@@ -18,6 +18,7 @@ class InteractionAnalysisAgent:
             "Provide a 2-3 word search query to look up clinical care guidelines for this specific behavior.\n"
             "Additionally, extract a chronological behavioral_timeline of observation points mapping specific timeframes "
             "(e.g., '0:00 - 0:03') to the patient's observable behavior/speech, a clinical symptom term, and their underlying emotional or cognitive state.\n"
+            "Determine the primary language used in the interaction (both video/audio dialogue and text input). If the interaction language is not English, specify the language name (e.g., 'Spanish', 'Tagalog'). If it is English, specify 'English'.\n"
             "Provide output strictly matching the required schema."
         )
 
