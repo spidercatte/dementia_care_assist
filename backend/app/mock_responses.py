@@ -1,4 +1,4 @@
-from app.schemas import FinalCoachingResponse, BehaviorRecognition, Recommendation
+from app.schemas import FinalCoachingResponse, BehaviorRecognition, Recommendation, BehavioralObservation
 
 # Mock response for Medication Refusal
 MOCK_MED_REFUSAL = FinalCoachingResponse(
@@ -10,6 +10,26 @@ MOCK_MED_REFUSAL = FinalCoachingResponse(
     try_saying="I see you want to make sure your money is safe, Dad. I'll lock everything in the desk drawer. Let's have a cup of warm tea first.",
     avoid_saying="You didn't take your pills! Stop saying I'm stealing, I'm your daughter and the doctor ordered these!",
     safety_note="If cardiac medication is missed for more than 48 hours, contact his cardiologist. Ensure he does not hide pills in his mouth.",
+    behavioral_timeline=[
+        BehavioralObservation(
+            timeframe="0:00 - 0:03",
+            observable_behavior="Rapidly repeating the filler word 'iyon, iyon, iyon' ('that, that, that') while pointing dynamically to his pockets.",
+            clinical_symptom="Perseveration & Word-Finding Difficulty",
+            cognitive_state="Mild Frustration / Desire to Communicate: Highly motivated to explain but faces vocabulary recall barrier."
+        ),
+        BehavioralObservation(
+            timeframe="0:04 - 0:07",
+            observable_behavior="Softens voice, slows down speech, and settles on the phrases 'ganito' ('like this') when referring to his medication.",
+            clinical_symptom="Circumlocution (talking around a word)",
+            cognitive_state="Resignation / Searching for Validation: Adapting to inability to find the exact word by simplifying."
+        ),
+        BehavioralObservation(
+            timeframe="0:08 - 0:13",
+            observable_behavior="Delivers the line 'Ako rin namang anak ito...' ('I am also a child here...') with a steady, unblinking gaze.",
+            clinical_symptom="Chronological Disorientation (Identity Shifting)",
+            cognitive_state="Vulnerability / Comfort Seeking: Placing himself in the role of a child to express need for care, safety, and direction."
+        )
+    ],
     behavior_analysis=BehaviorRecognition(
         patient_emotion="agitated and suspicious",
         patient_triggers=["direct correction", "showing the pill bottle", "talking about doctors"],
@@ -58,6 +78,26 @@ MOCK_SHOWER_RESISTANCE = FinalCoachingResponse(
     try_saying="Let's go get warmed up in the bathroom, Arthur. I have a nice warm towel waiting for you.",
     avoid_saying="You need to take a shower now, you smell bad and haven't washed in three days!",
     safety_note="Ensure grab bars are installed. High risk of slips if patient becomes physically resistant on wet tile.",
+    behavioral_timeline=[
+        BehavioralObservation(
+            timeframe="0:00 - 0:04",
+            observable_behavior="Steps backward away from the bathroom door, shaking head side to side and crossing arms.",
+            clinical_symptom="Oppositional Behavior & Gestural Avoidance",
+            cognitive_state="Fear/Defense: Feeling threatened by the request or the prospect of sensory discomfort."
+        ),
+        BehavioralObservation(
+            timeframe="0:05 - 0:08",
+            observable_behavior="Mumbles 'Yesterday... yesterday...' repeatedly while looking down and touching his shirt.",
+            clinical_symptom="Perseveration & Disorientation",
+            cognitive_state="Defensiveness/Shame: Believes he has already showered and feels attacked by the suggestion that he is dirty."
+        ),
+        BehavioralObservation(
+            timeframe="0:09 - 0:12",
+            observable_behavior="Pushes caregiver's hand away when touched on the arm, voice raising as he speaks.",
+            clinical_symptom="Tactile Defensiveness & Reactive Agitation",
+            cognitive_state="Fight-or-Flight Response: The sudden physical contact triggers an automatic defensive reflex."
+        )
+    ],
     behavior_analysis=BehaviorRecognition(
         patient_emotion="frightened and defensive",
         patient_triggers=["calling it a 'shower'", "accusing him of smelling", "cold bathroom air"],
@@ -105,6 +145,26 @@ MOCK_WANDERING = FinalCoachingResponse(
     try_saying="You want to make sure your mom is taken care of, Arthur. She is so lucky to have you. What kind of chores did you do on the farm?",
     avoid_saying="Arthur, your mom died twenty years ago! You live here with me now, your old house was sold!",
     safety_note="Wandering risk is elevated. Install slide locks out of direct eye-line on exit doors, or use exit sensor mats.",
+    behavioral_timeline=[
+        BehavioralObservation(
+            timeframe="0:00 - 0:03",
+            observable_behavior="Paces back and forth near the front door, repeatedly checking the lock and window.",
+            clinical_symptom="Psychomotor Agitation & Exit Seeking",
+            cognitive_state="Anxiety/Displacement: Driven by an internal urgency to go somewhere else to feel secure."
+        ),
+        BehavioralObservation(
+            timeframe="0:04 - 0:07",
+            observable_behavior="Pulls a suitcase, tearfully repeating 'My mother is waiting... she needs help on the farm.'",
+            clinical_symptom="Chronological Disorientation & Past Role Reliving",
+            cognitive_state="Sense of Duty/Regression: Living in a cognitive state of decades past, driven by the strong emotional obligation to his parents."
+        ),
+        BehavioralObservation(
+            timeframe="0:08 - 0:12",
+            observable_behavior="Screams and tries to open the door when told his mother is dead, breathing heavily.",
+            clinical_symptom="Catastrophic Reaction",
+            cognitive_state="Acute Grief/Panic: Hearing the reality orientation feels like receiving news of a fresh, sudden tragedy."
+        )
+    ],
     behavior_analysis=BehaviorRecognition(
         patient_emotion="grieving, anxious, and determined",
         patient_triggers=["sundowning shadows", "feeling trapped", "memory of farm chores"],
@@ -151,6 +211,20 @@ MOCK_DEFAULT = FinalCoachingResponse(
     try_saying="I hear you're feeling tired. Let's take a break and sit down. I'll make your favorite tea.",
     avoid_saying="You have to listen to me, we are going to do X, then Y, then Z. Why are you behaving like this?",
     safety_note="Ensure there are no physical hazards in the immediate walking path. Monitor for indicators of physical pain or discomfort.",
+    behavioral_timeline=[
+        BehavioralObservation(
+            timeframe="0:00 - 0:04",
+            observable_behavior="Stares blankly at the caregiver for several seconds after a multi-step instruction is given.",
+            clinical_symptom="Delayed Processing & Receptive Aphasia",
+            cognitive_state="Cognitive Overload: Striving to make sense of verbal inputs that exceed processing capacity."
+        ),
+        BehavioralObservation(
+            timeframe="0:05 - 0:08",
+            observable_behavior="Fidgets with coat buttons, sighing and turning away from the caregiver.",
+            clinical_symptom="Purposeless Motor Activity & Avoidance",
+            cognitive_state="Frustration/Fatigue: Frustrated by the inability to complete the task, leading to withdrawal."
+        )
+    ],
     behavior_analysis=BehaviorRecognition(
         patient_emotion="confused and overwhelmed",
         patient_triggers=["complex questions", "loud background sounds"],
@@ -185,7 +259,7 @@ def get_mock_coaching_response(description: str) -> FinalCoachingResponse:
     Parses key terms in the description to return the most relevant high-fidelity mock response.
     """
     d = description.lower()
-    if any(k in d for k in ["med", "pill", "tablet", "doctor", "poison", "steal"]):
+    if any(k in d for k in ["med", "pill", "tablet", "doctor", "poison", "steal", "20260623_205611", "sample_vid"]):
         return MOCK_MED_REFUSAL
     elif any(k in d for k in ["shower", "bath", "wash", "dirty", "clean", "bathroom"]):
         return MOCK_SHOWER_RESISTANCE

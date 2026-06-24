@@ -24,7 +24,9 @@ import {
   Mic,
   Square,
   Volume2,
-  Circle
+  Circle,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 const BACKEND_URL = 'http://localhost:8000';
@@ -45,6 +47,26 @@ const MOCK_ANALYSIS_MED_REFUSAL = {
     caregiver_communication_style: "impatient, lecturing, correcting Arthur's timeline",
     interaction_summary: "Arthur refused to take his afternoon heart medication, stating that he had already taken it and that his caregiver was trying to steal his money. The caregiver argued back, telling him he was wrong and showing him the pill bottle to 'prove' he hadn't taken it, which escalated Arthur's shouting."
   },
+  behavioral_timeline: [
+    {
+      timeframe: "0:00 - 0:03",
+      observable_behavior: "Rapidly repeating the filler word 'iyon, iyon, iyon' ('that, that, that') while pointing dynamically to his pockets.",
+      clinical_symptom: "Perseveration & Word-Finding Difficulty",
+      cognitive_state: "Mild Frustration / Desire to Communicate: Highly motivated to explain but faces vocabulary recall barrier."
+    },
+    {
+      timeframe: "0:04 - 0:07",
+      observable_behavior: "Softens voice, slows down speech, and settles on the phrases 'ganito' ('like this') when referring to his medication.",
+      clinical_symptom: "Circumlocution (talking around a word)",
+      cognitive_state: "Resignation / Searching for Validation: Adapting to inability to find the exact word by simplifying."
+    },
+    {
+      timeframe: "0:08 - 0:13",
+      observable_behavior: "Delivers the line 'Ako rin namang anak ito...' ('I am also a child here...') with a steady, unblinking gaze.",
+      clinical_symptom: "Chronological Disorientation (Identity Shifting)",
+      cognitive_state: "Vulnerability / Comfort Seeking: Placing himself in the role of a child to express need for care, safety, and direction."
+    }
+  ],
   strengths: [
     "Caregiver kept their voice volume relatively stable initially.",
     "Did not touch or physically force the patient."
@@ -102,6 +124,22 @@ const MOCK_SCENARIOS = [
 ];
 
 function App() {
+  // Theme State
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('theme') || 'light';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
+
+
   // Navigation & Config State
   const [activeTab, setActiveTab] = useState('dashboard');
   const [backendStatus, setBackendStatus] = useState('checking'); // checking, online, offline
@@ -626,23 +664,44 @@ function App() {
           </div>
         </div>
 
+        <div className="header-session-info" style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginRight: 'auto', marginLeft: '2rem' }}>
+          <div style={{ fontSize: '0.85rem', borderLeft: '1px solid var(--border-color)', paddingLeft: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div>
+              <span style={{ color: 'var(--text-muted)' }}>Patient: </span>
+              <strong style={{ color: 'var(--text-main)' }}>{patient.name}</strong>
+            </div>
+            <div>
+              <span style={{ color: 'var(--text-muted)' }}>Role: </span>
+              <strong style={{ color: 'var(--text-main)' }}>Primary Caregiver (Daughter)</strong>
+            </div>
+          </div>
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button
+            onClick={toggleTheme}
+            className="theme-toggle-btn"
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0.5rem',
+              borderRadius: '8px',
+              color: 'var(--text-muted)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+
           <div className="api-status">
             <span className={`status-dot ${backendStatus === 'online' ? 'online' : backendStatus === 'offline' ? 'offline' : ''}`}></span>
-            <span>Agent Server: {backendStatus.toUpperCase()}</span>
+            <span>Care Coach: {backendStatus.toUpperCase()}</span>
           </div>
-
-          {backendStatus === 'online' && (
-            <button
-              className="btn btn-secondary"
-              style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
-              onClick={seedDatabase}
-              disabled={isSeeding}
-            >
-              <Database size={14} />
-              {isSeeding ? 'Seeding...' : 'Seed RAG DB'}
-            </button>
-          )}
         </div>
       </header>
 
@@ -674,7 +733,7 @@ function App() {
           onClick={() => setActiveTab('guidelines')}
         >
           <BookOpen size={18} />
-          <span>Guidelines RAG</span>
+          <span>Care Guidelines</span>
         </button>
       </nav>
 
@@ -852,44 +911,44 @@ function App() {
                 {isAnalyzing ? (
                   <>
                     <RefreshCw className="spinner" size={16} />
-                    <span>Processing Team...</span>
+                    <span>Analyzing Interaction...</span>
                   </>
                 ) : (
                   <>
                     <Sparkles size={16} />
-                    <span>Run 5-Agent Analysis</span>
+                    <span>Analyze Care Interaction</span>
                   </>
                 )}
               </button>
 
-              {/* 5-Agent Processing Flow Visualizer */}
+              {/* Analysis Steps Visualizer */}
               {isAnalyzing && (
                 <div className="pipeline-status">
-                  <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)' }}>Orchestrating Specialized Agents:</p>
+                  <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)' }}>Coaching Analysis Sequence:</p>
 
                   <div className={`pipeline-step ${analysisStep === 1 ? 'active' : analysisStep > 1 ? 'completed' : ''}`}>
                     {analysisStep === 1 ? <div className="spinner" /> : <CheckCircle2 size={14} />}
-                    <span>Agent 1: Interaction Analysis (Verbal & Non-verbal Cues)</span>
+                    <span>Step 1: Identifying verbal & non-verbal interaction cues</span>
                   </div>
 
                   <div className={`pipeline-step ${analysisStep === 2 ? 'active' : analysisStep > 2 ? 'completed' : ''}`}>
                     {analysisStep === 2 ? <div className="spinner" /> : <CheckCircle2 size={14} />}
-                    <span>Agent 2: Patient Context Integration (Med Schedule, Triggers)</span>
+                    <span>Step 2: Checking patient context (schedule & triggers)</span>
                   </div>
 
                   <div className={`pipeline-step ${analysisStep === 3 ? 'active' : analysisStep > 3 ? 'completed' : ''}`}>
                     {analysisStep === 3 ? <div className="spinner" /> : <CheckCircle2 size={14} />}
-                    <span>Agent 3: Clinical Care RAG Ingestion (Nursing/OT Protocols)</span>
+                    <span>Step 3: Referencing clinical care guidelines</span>
                   </div>
 
                   <div className={`pipeline-step ${analysisStep === 4 ? 'active' : analysisStep > 4 ? 'completed' : ''}`}>
                     {analysisStep === 4 ? <div className="spinner" /> : <CheckCircle2 size={14} />}
-                    <span>Agent 4: Safety & Medical Escalation Risk Check</span>
+                    <span>Step 4: Assessing safety & medical risks</span>
                   </div>
 
                   <div className={`pipeline-step ${analysisStep === 5 ? 'active' : ''}`}>
                     {analysisStep === 5 ? <div className="spinner" /> : <CheckCircle2 size={14} />}
-                    <span>Agent 5: Caregiver Coaching Synthesis (Empathetic Dialogue Scripts)</span>
+                    <span>Step 5: Synthesizing caregiver coaching plan</span>
                   </div>
                 </div>
               )}
@@ -913,8 +972,8 @@ function App() {
               {isAnalyzing && (
                 <div style={{ textAlign: 'center', padding: '6rem 1.5rem', color: 'var(--text-muted)' }}>
                   <RefreshCw className="spinner" size={32} style={{ margin: '0 auto 1.5rem' }} />
-                  <p style={{ fontWeight: 600, color: 'var(--text-main)' }}>Consulting Specialized Agent Panel...</p>
-                  <p style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>Analyzing verbal tone, clinical context, care guidelines, and safety hazards.</p>
+                  <p style={{ fontWeight: 600, color: 'var(--text-main)' }}>Analyzing Care Interaction...</p>
+                  <p style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>Evaluating verbal tone, clinical context, care guidelines, and safety hazards.</p>
                 </div>
               )}
 
@@ -922,7 +981,7 @@ function App() {
                 <div className="feedback-grid fade-in">
 
                   {/* Summary & Behavior Recognition */}
-                  <div className="glass-card feedback-full-width" style={{ background: 'rgba(15, 23, 42, 0.3)', gap: '0.75rem' }}>
+                  <div className="glass-card feedback-full-width" style={{ background: 'var(--card-inner-bg)', gap: '0.75rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span className="api-status" style={{ background: 'var(--primary-glow)', border: '1px solid var(--primary)' }}>
                         <Smile size={14} style={{ color: 'var(--primary)' }} />
@@ -963,6 +1022,67 @@ function App() {
                             <li key={idx}>{flag}</li>
                           ))}
                         </ul>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Clinical Behavioral Timeline (Behavioral Coding Worksheet) */}
+                  {analysisResult.behavioral_timeline && analysisResult.behavioral_timeline.length > 0 && (
+                    <div className="glass-card feedback-full-width" style={{ background: 'var(--card-inner-bg)', gap: '1rem', border: '1px solid var(--border-color)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <Activity size={18} style={{ color: 'var(--primary)' }} />
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                          Clinical Behavioral Timeline
+                        </h3>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--primary)', marginLeft: 'auto', background: 'var(--primary-glow)', border: '1px solid var(--primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
+                          Behavioral Coding Worksheet
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        Chronological mapping of specific timeframes to observable patient behaviors, clinical symptoms, and underlying cognitive or emotional states.
+                      </p>
+                      <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
+                        <table className="timeline-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                              <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600, width: '120px' }}>Timeframe</th>
+                              <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>Observable Behavior / Speech</th>
+                              <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600, width: '220px' }}>Clinical Symptom Term</th>
+                              <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>Underlying Emotion / Cognitive State</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {analysisResult.behavioral_timeline.map((obs, idx) => (
+                              <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)', verticalAlign: 'top' }}>
+                                <td style={{ padding: '0.8rem' }}>
+                                  <span className="tag-pill" style={{ background: 'var(--primary-glow)', border: '1px solid var(--primary)', color: 'var(--primary)', fontWeight: 600, display: 'inline-block', fontSize: '0.8rem' }}>
+                                    {obs.timeframe}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '0.8rem', color: 'var(--text-light)', lineHeight: '1.4' }}>
+                                  {obs.observable_behavior}
+                                </td>
+                                <td style={{ padding: '0.8rem' }}>
+                                  <span style={{
+                                    background: 'var(--symptom-tag-bg)',
+                                    border: '1px solid var(--symptom-tag-border)',
+                                    color: 'var(--symptom-tag-color)',
+                                    fontSize: '0.8rem',
+                                    padding: '0.15rem 0.4rem',
+                                    borderRadius: '4px',
+                                    fontWeight: 500,
+                                    display: 'inline-block'
+                                  }}>
+                                    {obs.clinical_symptom}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '0.8rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', lineHeight: '1.4' }}>
+                                  {obs.cognitive_state}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   )}
@@ -1021,17 +1141,17 @@ function App() {
                   {/* Clinical Recommendations */}
                   <div className="feedback-full-width" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: 600, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                      Clinical Care Protocols (Synthesized via RAG)
+                      Clinical Care Protocols
                     </h3>
 
                     {analysisResult.recommendations.map((rec, idx) => (
-                      <div key={idx} className="glass-card" style={{ background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.15)' }}>
+                      <div key={idx} className="glass-card" style={{ background: 'var(--secondary-glow-bg)', border: '1px solid var(--secondary-glow-border)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontWeight: 700, color: 'var(--secondary)' }}>{rec.strategy_name}</span>
                           <span className="api-status" style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}>Grounded Advice</span>
                         </div>
                         <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>{rec.description}</p>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', borderTop: '1px dashed rgba(255, 255, 255, 0.05)', paddingTop: '0.5rem' }}>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
                           <strong>Why this works:</strong> {rec.rationality}
                         </p>
                       </div>
@@ -1129,7 +1249,7 @@ function App() {
                 </div>
                 <div className="tag-container">
                   {patient.preferences.map((p, idx) => (
-                    <div key={idx} className="tag-pill" style={{ borderColor: 'rgba(99, 102, 241, 0.2)', color: '#c7d2fe' }}>
+                    <div key={idx} className="tag-pill" style={{ borderColor: 'var(--preference-tag-border)', color: 'var(--preference-tag-color)' }}>
                       <span>{p}</span>
                       <button type="button" className="tag-delete-btn" onClick={() => handleRemovePreference(idx)}>
                         <Trash2 size={12} />
@@ -1276,10 +1396,10 @@ function App() {
           <div className="glass-card" style={{ maxWidth: '900px', margin: '0 auto' }}>
             <h2 className="card-title">
               <BookOpen size={20} className="logo-icon" />
-              Guidelines Knowledge Base (RAG)
+              Care Guidelines Library
             </h2>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Search the local vector database of dementia care guidelines. The AI Agent uses this database to retrieve verified caregiver protocols.
+              Search the database of dementia care guidelines. The system uses these guidelines to retrieve verified caregiver coaching protocols.
             </p>
 
             <form onSubmit={handleRAGSearch} style={{ display: 'flex', gap: '0.5rem', margin: '1rem 0' }}>
@@ -1299,7 +1419,7 @@ function App() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1.5rem' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 600, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', color: 'var(--primary)' }}>
-                {ragResults.length > 0 ? 'Search Results' : 'Default Guidelines Injected in ChromaDB'}
+                {ragResults.length > 0 ? 'Search Results' : 'Verified Dementia Care Guidelines'}
               </h3>
 
               {isSearchingRAG ? (
@@ -1333,7 +1453,7 @@ function App() {
                     <div key={idx} className="glass-card" style={{ padding: '1.25rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h4 style={{ fontWeight: 700, color: 'var(--text-main)' }}>{doc.title}</h4>
-                        <span className="api-status" style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: 'var(--secondary-glow)', color: '#a5b4fc', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                        <span className="api-status" style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: 'var(--secondary-glow)', color: 'var(--preference-tag-color)', border: '1px solid var(--preference-tag-border)' }}>
                           {doc.category}
                         </span>
                       </div>

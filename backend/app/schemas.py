@@ -4,6 +4,12 @@ from pydantic import BaseModel, Field
 # ==========================================
 # 1. Interaction Analysis Agent Schema
 # ==========================================
+class BehavioralObservation(BaseModel):
+    timeframe: str = Field(description="Timeframe of the observation (e.g., '0:00 - 0:03')")
+    observable_behavior: str = Field(description="Observable behavior, verbal speech, or physical action")
+    clinical_symptom: str = Field(description="Clinical symptom term (e.g., 'Perseveration', 'Circumlocution', 'Identity Shifting')")
+    cognitive_state: str = Field(description="Underlying emotion or cognitive/mental state")
+
 class InteractionAnalysisResponse(BaseModel):
     observed_behavior: str = Field(description="Summary of the behavior observed (e.g. medication refusal, physical resistance)")
     likely_trigger: str = Field(description="Identified trigger (verbal, environmental, tone) that initiated the behavior")
@@ -13,6 +19,7 @@ class InteractionAnalysisResponse(BaseModel):
     verbal_transcript_summary: str = Field(description="Summary of verbal exchange")
     non_verbal_cues: str = Field(description="Observed non-verbal cues (pacing, tone, posture, expressions)")
     rag_query: str = Field(description="2-3 keywords to search for care guidelines (e.g., 'medication refusal', 'shower resistance')")
+    behavioral_timeline: List[BehavioralObservation] = Field(description="Chronological timeline of behavioral observations")
 
 # ==========================================
 # 2. Patient Context Agent Schema
@@ -63,6 +70,7 @@ class FinalCoachingResponse(BaseModel):
     try_saying: str = Field(description="Empathetic script or phrase the caregiver should use")
     avoid_saying: str = Field(description="Specific logical/corrective phrase the caregiver should avoid")
     safety_note: str = Field(description="Immediate safety warnings or clinical instructions")
+    behavioral_timeline: List[BehavioralObservation] = Field(description="Chronological timeline of behavioral observations")
 
     # Matching UI Expectations
     behavior_analysis: BehaviorRecognition = Field(description="Combined behavior details")

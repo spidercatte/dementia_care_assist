@@ -24,6 +24,10 @@ class CaregiverCoachingAgent:
         safety: SafetyEscalationResponse
     ) -> FinalCoachingResponse:
         logger.info("Agent 5 running: Caregiver Coaching Synthesis...")
+        timeline_text = "\n".join([
+            f"- {obs.timeframe} | Behavior: {obs.observable_behavior} | Symptom: {obs.clinical_symptom} | State: {obs.cognitive_state}"
+            for obs in analysis.behavioral_timeline
+        ])
         prompt = (
             f"You are a supportive, empathetic Caregiver Coach.\n"
             f"Translate the following clinical findings and safety evaluations into a warm, helpful report:\n\n"
@@ -33,7 +37,8 @@ class CaregiverCoachingAgent:
             f"Caregiver Style: {analysis.caregiver_pattern}\n"
             f"Agitation: {analysis.agitation_level}/10 | Confusion: {analysis.confusion_level}/10\n"
             f"Verbal Summary: {analysis.verbal_transcript_summary}\n"
-            f"Non-verbal Cues: {analysis.non_verbal_cues}\n\n"
+            f"Non-verbal Cues: {analysis.non_verbal_cues}\n"
+            f"Clinical Timeline:\n{timeline_text}\n\n"
             f"--- CLINICAL GUIDANCE ---\n"
             f"Advice: {guidance.recommended_response}\n"
             f"Do Nots: {', '.join(guidance.do_nots)}\n"
@@ -48,7 +53,8 @@ class CaregiverCoachingAgent:
             f"3. Formulate specific dialog scripts in 'coaching_scripts': e.g., 'Avoid saying: ...' and 'Try saying: ...'.\n"
             f"4. Populate the 'recommendations' list with concrete method cards (e.g. Validation Therapy, Redirection) detailing the description and clinical rationality.\n"
             f"5. Map the outputs to matching fields: behavior_analysis, strengths, opportunities_for_improvement, clinical_safety_flags.\n"
-            f"6. Respond strictly in the required JSON schema."
+            f"6. Populate the 'behavioral_timeline' field with the timestamped observations provided.\n"
+            f"7. Respond strictly in the required JSON schema."
         )
 
         response = self.client.models.generate_content(
