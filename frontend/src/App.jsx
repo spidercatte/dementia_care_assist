@@ -40,6 +40,14 @@ const MOCK_PATIENT = {
   background: "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the late afternoon (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her."
 };
 
+const MOCK_ARTHUR = {
+  name: "Arthur",
+  dementia_type: "Lewy Body Dementia (Moderate Stage)",
+  triggers: ["hallucinations", "being corrected about visions", "sudden movements", "complex task demands"],
+  preferences: ["watching classic movies", "eating soft butterscotch candy", "holding a warm cup of coffee"],
+  background: "Arthur is 82 years old. He has Lewy Body dementia and experiences vivid visual hallucinations (often seeing children or small animals in the room). He gets highly anxious when others tell him these are not real. He is prone to motor fluctuations and stiffness, especially during transitions."
+};
+
 const MOCK_ANALYSIS_MED_REFUSAL = {
   behavior_analysis: {
     patient_emotion: "agitated and suspicious",
@@ -148,6 +156,7 @@ function App() {
 
   // Patient Profile State
   const [patient, setPatient] = useState(MOCK_PATIENT);
+  const [patientsList, setPatientsList] = useState([MOCK_PATIENT, MOCK_ARTHUR]);
   const [newTrigger, setNewTrigger] = useState('');
   const [newPreference, setNewPreference] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -283,11 +292,6 @@ function App() {
   const [ragResults, setRagResults] = useState([]);
   const [isSearchingRAG, setIsSearchingRAG] = useState(false);
 
-  // Check backend health on load
-  useEffect(() => {
-    checkBackendHealth();
-    loadPatientData();
-  }, []);
 
   const checkBackendHealth = async () => {
     try {
@@ -304,15 +308,54 @@ function App() {
 
   const loadPatientData = async () => {
     try {
-      const res = await fetch(`${BACKEND_URL}/patient`);
-      if (res.ok) {
-        const data = await res.json();
-        setPatient(data);
+      const listRes = await fetch(`${BACKEND_URL}/patients`);
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        setPatientsList(listData);
+        if (listData.length > 0) {
+          setPatient(listData[0]);
+        }
+      } else {
+        const res = await fetch(`${BACKEND_URL}/patient`);
+        if (res.ok) {
+          const data = await res.json();
+          setPatient(data);
+          setPatientsList([data]);
+        }
       }
     } catch (e) {
       console.log('Error loading patient data, using fallback.', e);
+      setPatientsList([MOCK_PATIENT, MOCK_ARTHUR]);
+      setPatient(MOCK_PATIENT);
     }
   };
+
+  const handleSwitchPatient = async (name) => {
+    if (backendStatus === 'online') {
+      try {
+        const res = await fetch(`${BACKEND_URL}/patient?name=${name}`);
+        if (res.ok) {
+          const data = await res.json();
+          setPatient(data);
+        }
+      } catch (e) {
+        console.error("Error switching patient:", e);
+      }
+    } else {
+      if (name === 'Maria') {
+        setPatient(MOCK_PATIENT);
+      } else if (name === 'Arthur') {
+        setPatient(MOCK_ARTHUR);
+      }
+    }
+  };
+
+  // Check backend health on load
+  useEffect(() => {
+    checkBackendHealth();
+    loadPatientData();
+  }, []);
+
 
   const seedDatabase = async () => {
     setIsSeeding(true);
@@ -346,6 +389,7 @@ function App() {
         if (res.ok) {
           const data = await res.json();
           setPatient(data);
+          setPatientsList(prev => prev.map(p => p.name === data.name ? data : p));
           alert('Patient profile saved to database!');
         }
       } catch (e) {
@@ -431,6 +475,7 @@ function App() {
                   if (selectedFile) {
                     const formData = new FormData();
                     formData.append('file', selectedFile);
+                    formData.append('patient_name', patient.name);
                     res = await fetch(`${BACKEND_URL}/analyze/file`, {
                       method: 'POST',
                       body: formData
@@ -439,7 +484,7 @@ function App() {
                     res = await fetch(`${BACKEND_URL}/analyze/text`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ description: inputText })
+                      body: JSON.stringify({ description: inputText, patient_name: patient.name })
                     });
                   }
 
@@ -630,7 +675,8 @@ function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             scenario: selectedScenario.title,
-            chat_history: updatedHistory
+            chat_history: updatedHistory,
+            patient_name: patient.name
           })
         });
         if (res.ok) {
@@ -725,7 +771,7 @@ function App() {
         const res = await fetch(`${BACKEND_URL}/analyze/text`, { // using text endpoint to get RAG feedback
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ description: ragQuery })
+          body: JSON.stringify({ description: ragQuery, patient_name: patient.name })
         });
         if (res.ok) {
           const data = await res.json();
@@ -807,14 +853,35 @@ function App() {
         </div>
 
         <div className="header-session-info" style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginRight: 'auto', marginLeft: '2rem' }}>
-          <div style={{ fontSize: '0.85rem', borderLeft: '1px solid var(--border-color)', paddingLeft: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <div>
+          <div style={{ fontSize: '0.85rem', borderLeft: '1px solid var(--border-color)', paddingLeft: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <span style={{ color: 'var(--text-muted)' }}>Patient: </span>
-              <strong style={{ color: 'var(--text-main)' }}>{patient.name}</strong>
+              <select
+                value={patient.name}
+                onChange={(e) => handleSwitchPatient(e.target.value)}
+                style={{
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-main)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px',
+                  padding: '2px 8px',
+                  fontWeight: 'bold',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  boxShadow: 'var(--shadow-sm)'
+                }}
+              >
+                {patientsList.map(p => (
+                  <option key={p.name} value={p.name}>{p.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <span style={{ color: 'var(--text-muted)' }}>Role: </span>
-              <strong style={{ color: 'var(--text-main)' }}>Primary Caregiver (Daughter)</strong>
+              <strong style={{ color: 'var(--text-main)' }}>
+                {patient.name === 'Maria' ? 'Primary Caregiver (Daughter)' : 'Primary Caregiver'}
+              </strong>
             </div>
           </div>
         </div>
@@ -1492,7 +1559,7 @@ function App() {
                 Practice Scenarios
               </h2>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Select a scenario. The simulated patient agent (Maria) will respond realistically. Practice validation therapy and redirection to keep her agitation low.
+                Select a scenario. The simulated patient agent ({patient.name}) will respond realistically. Practice validation therapy and redirection to keep their agitation low.
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -1523,13 +1590,13 @@ function App() {
             <div className="glass-card simulator-panel">
               <div className="simulator-header">
                 <div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Training Chat with Maria</h3>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Training Chat with {patient.name}</h3>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Scenario: {selectedScenario.title}</p>
                 </div>
 
                 {/* Agitation Score Meter */}
                 <div className="agitation-meter-wrapper">
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>Maria's Agitation:</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>{patient.name}'s Agitation:</span>
                   <span style={{ fontWeight: 800, color: simAgitation > 7 ? 'var(--color-danger)' : simAgitation > 4 ? 'var(--color-warning)' : 'var(--color-success)' }}>
                     {simAgitation}/10
                   </span>
@@ -1559,7 +1626,7 @@ function App() {
                 {isSimLoading && (
                   <div className="chat-bubble patient" style={{ opacity: 0.6 }}>
                     <RefreshCw className="spinner" size={14} style={{ display: 'inline-block', marginRight: '0.5rem' }} />
-                    Maria is thinking...
+                    {patient.name} is thinking...
                   </div>
                 )}
 
@@ -1578,7 +1645,7 @@ function App() {
                   type="text"
                   className="form-input"
                   style={{ flex: 1 }}
-                  placeholder="Type your response to Maria..."
+                  placeholder={`Type your response to ${patient.name}...`}
                   value={simInput}
                   onChange={(e) => setSimInput(e.target.value)}
                   disabled={isSimLoading}

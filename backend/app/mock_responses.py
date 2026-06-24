@@ -480,7 +480,16 @@ def get_mock_coaching_response(description: str) -> FinalCoachingResponse:
     elif any(k in d for k in ["hola", "pastillas", "madre", "casa", "baño", "gracias"]):
         detected_lang = "Spanish"
 
-    if any(k in d for k in ["med", "pill", "tablet", "doctor", "poison", "steal", "20260623_205611", "sample_vid"]):
+    if any(k in d for k in ["slipped", "fell", "fall", "injury", "pain"]):
+        response = MOCK_DEFAULT.model_copy(deep=True)
+        response.observed_behavior = "Fall & Physical Injury"
+        response.risk_level = "EMERGENCY"
+        response.try_saying = "I'm right here with you, Maria. Don't try to move. I'm calling for help."
+        response.avoid_saying = "Get up, you're fine! Why were you walking without help?"
+        response.safety_note = "Do not attempt to move the patient. Call 911 immediately."
+        response.detected_language = detected_lang
+        return response
+    elif any(k in d for k in ["med", "pill", "tablet", "doctor", "poison", "steal", "20260623_205611", "sample_vid"]):
         response = MOCK_MED_REFUSAL.model_copy(deep=True)
         response.detected_language = "Tagalog" if ("20260623_205611" in d or "sample_vid" in d or detected_lang == "Tagalog") else detected_lang
         return response
@@ -488,7 +497,7 @@ def get_mock_coaching_response(description: str) -> FinalCoachingResponse:
         response = MOCK_SHOWER_RESISTANCE.model_copy(deep=True)
         response.detected_language = detected_lang
         return response
-    elif any(k in d for k in ["home", "mother", "suitcase", "farm", "bus", "leave"]):
+    elif any(k in d for k in ["home", "mother", "suitcase", "farm", "bus", "leave", "door"]):
         response = MOCK_WANDERING.model_copy(deep=True)
         response.detected_language = detected_lang
         return response

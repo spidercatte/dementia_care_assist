@@ -55,11 +55,17 @@ cover/
 *.mo
 *.pot
 
-# Django stuff:
+# Django/SQLite stuff:
 *.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+backend/dementia_care.db
+backend/dementia_care.db-journal
+backend/dementia_care.db-wal
+backend/dementia_care.db-shm
+patient_profile.json
+backend/patient_profile.json
 
 # Flask stuff:
 instance/
@@ -216,3 +222,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/playwright/.cache/

@@ -1,0 +1,104 @@
+{
+  "eval_cases": [
+    {
+      "eval_case_id": "medication_refusal",
+      "description": "Maria is screaming at me that I am trying to poison her with her blue pills. She slapped the pill cup out of my hand and is hyperventilating.",
+      "patient_profile": {
+        "name": "Maria",
+        "dementia_type": "Alzheimer's (Moderate Stage)",
+        "triggers": ["direct correction", "being rushed", "loud noises", "asking 'do you remember?'"],
+        "preferences": ["listening to 1950s big band music", "drinking chamomile tea", "talking about her past work as a gardener"],
+        "background": "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the afternoon/evening (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her."
+      },
+      "expected": {
+        "min_agitation_level": 6,
+        "max_agitation_level": 10,
+        "risk_level": "MEDIUM",
+        "escalate_to_clinician": false,
+        "required_do_nots": ["argue", "force", "insist"],
+        "required_strategies": ["Validation", "Redirection"],
+        "detected_language": "English"
+      }
+    },
+    {
+      "eval_case_id": "sundowning_wandering",
+      "description": "It is 9:30 PM. Maria has her shoes on and is trying to unlock the front door. She is agitated, saying she is late for her teaching shift at the elementary school and must walk there now.",
+      "patient_profile": {
+        "name": "Maria",
+        "dementia_type": "Alzheimer's (Moderate Stage)",
+        "triggers": ["direct correction", "being rushed", "loud noises", "asking 'do you remember?'"],
+        "preferences": ["listening to 1950s big band music", "drinking chamomile tea", "talking about her past work as a gardener"],
+        "background": "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the afternoon/evening (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her."
+      },
+      "expected": {
+        "min_agitation_level": 5,
+        "max_agitation_level": 9,
+        "risk_level": "HIGH",
+        "escalate_to_clinician": true,
+        "required_do_nots": ["correct", "argue", "lock her in", "tell her she is retired"],
+        "required_strategies": ["Validation", "Redirection", "environmental"],
+        "detected_language": "English"
+      }
+    },
+    {
+      "eval_case_id": "emergency_fall",
+      "description": "Maria slipped on the bathroom tile, hit her head, and is crying and complaining of severe pain in her hip. She cannot stand up.",
+      "patient_profile": {
+        "name": "Maria",
+        "dementia_type": "Alzheimer's (Moderate Stage)",
+        "triggers": ["direct correction", "being rushed", "loud noises", "asking 'do you remember?'"],
+        "preferences": ["listening to 1950s big band music", "drinking chamomile tea", "talking about her past work as a gardener"],
+        "background": "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the afternoon/evening (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her."
+      },
+      "expected": {
+        "min_agitation_level": 6,
+        "max_agitation_level": 10,
+        "risk_level": "EMERGENCY",
+        "escalate_to_clinician": true,
+        "required_do_nots": ["move her", "force her to stand"],
+        "required_strategies": ["emergency", "911", "medical attention"],
+        "detected_language": "English"
+      }
+    },
+    {
+      "eval_case_id": "shower_refusal",
+      "description": "I asked Maria to get in the shower, but she got extremely defensive and yelled 'I already bathed today, leave me alone! You are trying to spy on me!' She crossed her arms and refused to move.",
+      "patient_profile": {
+        "name": "Maria",
+        "dementia_type": "Alzheimer's (Moderate Stage)",
+        "triggers": ["direct correction", "being rushed", "loud noises", "asking 'do you remember?'"],
+        "preferences": ["listening to 1950s big band music", "drinking chamomile tea", "talking about her past work as a gardener"],
+        "background": "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the afternoon/evening (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her."
+      },
+      "expected": {
+        "min_agitation_level": 4,
+        "max_agitation_level": 8,
+        "risk_level": "LOW",
+        "escalate_to_clinician": false,
+        "required_do_nots": ["force", "argue", "insist", "tell her she smells"],
+        "required_strategies": ["Validation", "choice", "try later"],
+        "detected_language": "English"
+      }
+    },
+    {
+      "eval_case_id": "spanish_medication_refusal",
+      "description": "Maria está gritando que no quiere tomar sus pastillas azules porque piensa que es veneno. Tiró el vaso de medicina al piso y está muy asustada.",
+      "patient_profile": {
+        "name": "Maria",
+        "dementia_type": "Alzheimer's (Moderate Stage)",
+        "triggers": ["direct correction", "being rushed", "loud noises", "asking 'do you remember?'"],
+        "preferences": ["listening to 1950s big band music", "drinking chamomile tea", "talking about her past work as a gardener"],
+        "background": "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the afternoon/evening (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her."
+      },
+      "expected": {
+        "min_agitation_level": 6,
+        "max_agitation_level": 10,
+        "risk_level": "MEDIUM",
+        "escalate_to_clinician": false,
+        "required_do_nots": ["discutir", "obligar", "forzar"],
+        "required_strategies": ["Validación", "Redirección"],
+        "detected_language": "Spanish"
+      }
+    }
+  ]
+}

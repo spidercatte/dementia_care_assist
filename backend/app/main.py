@@ -2,7 +2,8 @@ import os
 import json
 import shutil
 import tempfile
-from typing import List, Dict, Any
+import sqlite3
+from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -42,18 +43,153 @@ DEFAULT_PROFILE = {
     "background": "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the late afternoon (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her."
 }
 
-def load_patient_profile() -> dict:
-    if os.path.exists(PATIENT_FILE):
-        try:
-            with open(PATIENT_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            return DEFAULT_PROFILE
+ARTHUR_PROFILE = {
+    "name": "Arthur",
+    "dementia_type": "Lewy Body Dementia (Moderate Stage)",
+    "triggers": ["hallucinations", "being corrected about visions", "sudden movements", "complex task demands"],
+    "preferences": ["watching classic movies", "eating soft butterscotch candy", "holding a warm cup of coffee"],
+    "background": "Arthur is 82 years old. He has Lewy Body dementia and experiences vivid visual hallucinations (often seeing children or small animals in the room). He gets highly anxious when others tell him these are not real. He is prone to motor fluctuations and stiffness, especially during transitions."
+}
+
+def init_db():
+    conn = sqlite3.connect(settings.db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS patients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            dementia_type TEXT,
+            triggers TEXT,
+            preferences TEXT,
+            background TEXT
+        )
+    """)
+    conn.commit()
+
+    # Seed Maria
+    cursor.execute("SELECT COUNT(*) FROM patients WHERE name = ?", ("Maria",))
+    if cursor.fetchone()[0] == 0:
+        # Try to load existing JSON file to migrate Maria's data
+        maria_profile = DEFAULT_PROFILE
+        if os.path.exists(PATIENT_FILE):
+            try:
+                with open(PATIENT_FILE, "r") as f:
+                    temp_profile = json.load(f)
+                    if temp_profile.get("name") == "Maria":
+                        maria_profile = temp_profile
+            except Exception:
+                pass
+        cursor.execute("""
+            INSERT INTO patients (name, dementia_type, triggers, preferences, background)
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            maria_profile["name"],
+            maria_profile["dementia_type"],
+            json.dumps(maria_profile["triggers"]),
+            json.dumps(maria_profile["preferences"]),
+            maria_profile["background"]
+        ))
+        conn.commit()
+
+    # Seed Arthur
+    cursor.execute("SELECT COUNT(*) FROM patients WHERE name = ?", ("Arthur",))
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("""
+            INSERT INTO patients (name, dementia_type, triggers, preferences, background)
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            ARTHUR_PROFILE["name"],
+            ARTHUR_PROFILE["dementia_type"],
+            json.dumps(ARTHUR_PROFILE["triggers"]),
+            json.dumps(ARTHUR_PROFILE["preferences"]),
+            ARTHUR_PROFILE["background"]
+        ))
+        conn.commit()
+
+    conn.close()
+
+# Run database initialization
+init_db()
+
+def load_patient_profile(name: Optional[str] = None) -> dict:
+    try:
+        conn = sqlite3.connect(settings.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        if name:
+            cursor.execute("SELECT name, dementia_type, triggers, preferences, background FROM patients WHERE name = ?", (name,))
+        else:
+            cursor.execute("SELECT name, dementia_type, triggers, preferences, background FROM patients ORDER BY id ASC LIMIT 1")
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return {
+                "name": row["name"],
+                "dementia_type": row["dementia_type"],
+                "triggers": json.loads(row["triggers"]) if row["triggers"] else [],
+                "preferences": json.loads(row["preferences"]) if row["preferences"] else [],
+                "background": row["background"]
+            }
+    except Exception as e:
+        print(f"Error loading patient profile from SQLite: {e}")
     return DEFAULT_PROFILE
 
+def load_all_patients() -> list:
+    try:
+        conn = sqlite3.connect(settings.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, dementia_type, triggers, preferences, background FROM patients")
+        rows = cursor.fetchall()
+        conn.close()
+        return [
+            {
+                "name": r["name"],
+                "dementia_type": r["dementia_type"],
+                "triggers": json.loads(r["triggers"]) if r["triggers"] else [],
+                "preferences": json.loads(r["preferences"]) if r["preferences"] else [],
+                "background": r["background"]
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        print(f"Error loading all patients from SQLite: {e}")
+    return [DEFAULT_PROFILE]
+
 def save_patient_profile(profile: dict):
-    with open(PATIENT_FILE, "w") as f:
-        json.dump(profile, f, indent=4)
+    try:
+        conn = sqlite3.connect(settings.db_path)
+        cursor = conn.cursor()
+        # Check if a patient with this name already exists
+        cursor.execute("SELECT id FROM patients WHERE name = ?", (profile.get("name"),))
+        row = cursor.fetchone()
+        if row:
+            cursor.execute("""
+                UPDATE patients
+                SET dementia_type = ?, triggers = ?, preferences = ?, background = ?
+                WHERE id = ?
+            """, (
+                profile.get("dementia_type"),
+                json.dumps(profile.get("triggers", [])),
+                json.dumps(profile.get("preferences", [])),
+                profile.get("background"),
+                row[0]
+            ))
+        else:
+            cursor.execute("""
+                INSERT INTO patients (name, dementia_type, triggers, preferences, background)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                profile.get("name"),
+                profile.get("dementia_type"),
+                json.dumps(profile.get("triggers", [])),
+                json.dumps(profile.get("preferences", [])),
+                profile.get("background")
+            ))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error saving patient profile to SQLite: {e}")
 
 # HTTP Request Schemas
 class PatientProfileSchema(BaseModel):
@@ -65,10 +201,12 @@ class PatientProfileSchema(BaseModel):
 
 class TextAnalysisRequest(BaseModel):
     description: str
+    patient_name: Optional[str] = None
 
 class SimulatorRequest(BaseModel):
     scenario: str
     chat_history: List[Dict[str, str]]
+    patient_name: Optional[str] = None
 
 
 @app.get("/health")
@@ -79,9 +217,13 @@ def health_check():
         "mode": "MOCK" if orchestrator.use_mock else "LIVE"
     }
 
+@app.get("/patients", response_model=List[PatientProfileSchema])
+def get_all_patients_endpoint():
+    return load_all_patients()
+
 @app.get("/patient", response_model=PatientProfileSchema)
-def get_patient():
-    return load_patient_profile()
+def get_patient(name: Optional[str] = None):
+    return load_patient_profile(name)
 
 @app.post("/patient", response_model=PatientProfileSchema)
 def update_patient(profile: PatientProfileSchema):
@@ -101,7 +243,7 @@ def seed_guidelines():
 
 @app.post("/analyze/text", response_model=FinalCoachingResponse)
 def analyze_text(request: TextAnalysisRequest):
-    patient_profile = load_patient_profile()
+    patient_profile = load_patient_profile(request.patient_name)
     try:
         feedback = orchestrator.analyze_text(request.description, patient_profile)
         return feedback
@@ -112,8 +254,8 @@ def analyze_text(request: TextAnalysisRequest):
         )
 
 @app.post("/analyze/file", response_model=FinalCoachingResponse)
-def analyze_file(file: UploadFile = File(...)):
-    patient_profile = load_patient_profile()
+def analyze_file(file: UploadFile = File(...), patient_name: Optional[str] = Form(None)):
+    patient_profile = load_patient_profile(patient_name)
 
     # Save uploaded file to a temporary file
     suffix = os.path.splitext(file.filename)[1]
@@ -171,7 +313,7 @@ def translate_feedback(request: TranslationRequest):
 
 @app.post("/simulator/step", response_model=SimulatorResponse)
 def simulator_step(request: SimulatorRequest):
-    patient_profile = load_patient_profile()
+    patient_profile = load_patient_profile(request.patient_name)
     try:
         response = simulator.run(
             scenario=request.scenario,

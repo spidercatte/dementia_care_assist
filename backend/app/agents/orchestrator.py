@@ -70,9 +70,16 @@ class OrchestratorAgent:
             ])
 
             # Step 3: Care Guidance Agent
+            context_summary = (
+                f"Clinical Stage: {context.clinical_stage}\n"
+                f"Active Triggers: {', '.join(context.active_triggers)}\n"
+                f"Preferences: {', '.join(context.preferences)}\n"
+                f"Routine Constraints: {', '.join(context.daily_routine_constraints)}\n"
+                f"Health Risk Factors: {', '.join(context.health_risk_factors)}"
+            )
             guidance = self.guidance_expert.run(
                 interaction_summary=analysis.observed_behavior + " - " + analysis.verbal_transcript_summary,
-                patient_context=context.context_synthesis,
+                patient_context=context_summary,
                 guidelines_text=guidelines_text
             )
             logger.info("Step 3 Complete.")

@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "gcloud": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@google-cloud/gcloud-mcp"
+      ]
+    },
+    "sqlite": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sqlite",
+        "/workspaces/dementia_care_assist/backend/dementia_care.db"
+      ]
+    }
+  }
+}

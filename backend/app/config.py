@@ -12,6 +12,7 @@ class Settings(BaseSettings):
 
     # RAG / Database Settings
     chroma_db_path: str = "chroma_db"
+    db_path: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "dementia_care.db")
 
     # CORS Settings
     allowed_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
