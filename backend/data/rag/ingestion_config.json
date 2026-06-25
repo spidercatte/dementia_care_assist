@@ -1,0 +1,42 @@
+{
+  "collection_name": "dementia_care_guidelines",
+  "file_type": "markdown",
+  "chunking_strategy": "heading_based",
+  "recommended_chunk_levels": [
+    "#",
+    "##"
+  ],
+  "embedding_text_fields": [
+    "title",
+    "category",
+    "scenario",
+    "scenario_triggers",
+    "body"
+  ],
+  "metadata_fields": [
+    "source_file",
+    "title",
+    "category",
+    "scenario",
+    "scenario_triggers",
+    "risk_level",
+    "audience",
+    "requires_escalation_check"
+  ],
+  "retrieval_notes": {
+    "top_k": 4,
+    "rerank": true,
+    "always_include": [
+      "_global_safety_rules.md",
+      "_escalation_policy.md"
+    ],
+    "output_format": [
+      "what_may_be_happening",
+      "what_to_do_now",
+      "what_to_say",
+      "what_to_avoid",
+      "patient_specific_warning",
+      "escalation_check"
+    ]
+  }
+}

@@ -97,44 +97,118 @@ def query_guidelines(query_text: str, n_results: int = 3):
 
 def seed_default_guidelines():
     import os
-    data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-    file_path = os.path.join(data_dir, "dementia_care_guidelines.md")
+    import yaml
 
-    if not os.path.exists(file_path):
-        logger.error(f"Guidelines markdown file not found at: {file_path}")
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    rag_guidelines_dir = os.path.join(backend_dir, "data", "rag", "guidelines")
+    old_file_path = os.path.join(backend_dir, "data", "dementia_care_guidelines.md")
+
+    # Determine which path to seed from
+    use_new_structure = os.path.exists(rag_guidelines_dir)
+
+    if not use_new_structure and not os.path.exists(old_file_path):
+        logger.error(f"Neither RAG guidelines directory ({rag_guidelines_dir}) nor old guidelines file ({old_file_path}) found.")
         return
 
     try:
-        collection = get_collection()
+        # Recreate the collection to clear out any old/stale documents
+        client = get_chroma_client()
         try:
-            if collection.count() > 0:
-                logger.info("ChromaDB guidelines collection already has documents. Skipping seeding.")
-                return
+            client.delete_collection("dementia_guidelines")
+            logger.info("Deleted existing ChromaDB collection 'dementia_guidelines' for re-seeding.")
         except Exception as e:
-            logger.warning(f"Could not check ChromaDB collection count: {e}. Proceeding with seeding.")
+            logger.warning(f"Could not delete collection (might not exist yet): {e}")
 
-        with open(file_path, "r") as f:
-            content = f.read()
+        # Get fresh collection
+        collection = get_collection()
 
-        sections = content.split("##")
-        # First section is '# Clinical Dementia Care Guidelines\n\n', discard it
-        sections = sections[1:]
+        if use_new_structure:
+            logger.info(f"Seeding guidelines from directory: {rag_guidelines_dir}")
+            files = [f for f in os.listdir(rag_guidelines_dir) if f.endswith(".md")]
+            if not files:
+                logger.warning(f"No markdown files found in: {rag_guidelines_dir}")
+                return
 
-        for idx, sec in enumerate(sections):
-            lines = sec.strip().split("\n")
-            title = lines[0].strip()
-            body = "\n".join(lines[1:]).strip()
+            for filename in sorted(files):
+                file_path = os.path.join(rag_guidelines_dir, filename)
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
 
-            # Simple slug generator for ID
-            doc_id = title.lower().replace(" ", "_").replace("/", "_").replace("&", "_").replace("(", "").replace(")", "")
+                frontmatter = {}
+                body = content
+                content_stripped = content.strip()
+                if content_stripped.startswith("---"):
+                    parts = content_stripped.split("---", 2)
+                    if len(parts) >= 3:
+                        try:
+                            frontmatter = yaml.safe_load(parts[1]) or {}
+                        except Exception as e:
+                            logger.warning(f"Failed to parse frontmatter in {filename}: {e}")
+                        body = parts[2].strip()
 
-            ingest_guideline(
-                doc_id=doc_id,
-                text=body,
-                category="Dementia Care Protocol",
-                title=title
-            )
-        logger.info("Successfully seeded default dementia care guidelines from markdown file.")
+                title = frontmatter.get("title", filename.replace(".md", "").replace("_", " ").title())
+                category = frontmatter.get("category", "Dementia Care Protocol")
+
+                # Prepare metadata (ensure all values are simple types required by ChromaDB)
+                metadata = {
+                    "source_file": filename,
+                    "title": title,
+                    "category": category,
+                }
+
+                # Map optional fields from frontmatter into metadata if present
+                optional_fields = ["scenario", "risk_level", "audience", "requires_escalation_check"]
+                for field in optional_fields:
+                    if field in frontmatter:
+                        val = frontmatter[field]
+                        if isinstance(val, bool):
+                            metadata[field] = val
+                        else:
+                            metadata[field] = str(val)
+
+                # Handle scenario_triggers if present (convert list to comma-separated string)
+                if "scenario_triggers" in frontmatter:
+                    triggers = frontmatter["scenario_triggers"]
+                    if isinstance(triggers, list):
+                        metadata["scenario_triggers"] = ", ".join(triggers)
+                    else:
+                        metadata["scenario_triggers"] = str(triggers)
+
+                # doc_id is the filename without extension
+                doc_id = filename.replace(".md", "")
+
+                collection.upsert(
+                    ids=[doc_id],
+                    documents=[body],
+                    metadatas=[metadata]
+                )
+                logger.info(f"Ingested guideline: {title} ({category}) from {filename}")
+
+            logger.info("Successfully seeded dementia care guidelines from multi-file RAG data.")
+        else:
+            logger.info(f"Seeding guidelines from old file path: {old_file_path}")
+            with open(old_file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            sections = content.split("##")
+            # First section is '# Clinical Dementia Care Guidelines\n\n', discard it
+            sections = sections[1:]
+
+            for idx, sec in enumerate(sections):
+                lines = sec.strip().split("\n")
+                title = lines[0].strip()
+                body = "\n".join(lines[1:]).strip()
+
+                # Simple slug generator for ID
+                doc_id = title.lower().replace(" ", "_").replace("/", "_").replace("&", "_").replace("(", "").replace(")", "")
+
+                ingest_guideline(
+                    doc_id=doc_id,
+                    text=body,
+                    category="Dementia Care Protocol",
+                    title=title
+                )
+            logger.info("Successfully seeded dementia care guidelines from old markdown file.")
     except Exception as e:
-        logger.error(f"Error seeding guidelines from file: {e}")
+        logger.error(f"Error seeding guidelines: {e}")
         raise e

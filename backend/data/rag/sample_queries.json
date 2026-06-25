@@ -1,0 +1,29 @@
+[
+  {
+    "query": "Patient refuses medication and says the pills are poison.",
+    "expected_files": [
+      "02_medication_refusal.md",
+      "07_hallucinations_paranoia.md",
+      "13_caregiver_self_regulation.md",
+      "15_escalation_rules.md"
+    ]
+  },
+  {
+    "query": "Patient keeps asking to go home and is pacing near the door.",
+    "expected_files": [
+      "04_repetitive_questions_and_go_home.md",
+      "08_wandering_exit_seeking.md",
+      "05_sundowning_pacing.md",
+      "15_escalation_rules.md"
+    ]
+  },
+  {
+    "query": "Patient becomes angry during bathing and pushes the caregiver away.",
+    "expected_files": [
+      "03_personal_care_resistance.md",
+      "12_aggression_safety.md",
+      "13_caregiver_self_regulation.md",
+      "14_patient_context_personalization.md"
+    ]
+  }
+]
