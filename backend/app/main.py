@@ -2,7 +2,6 @@ import os
 import json
 import shutil
 import tempfile
-import sqlite3
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +9,7 @@ from pydantic import BaseModel
 
 from google.genai import types
 from app.config import settings
+from app.database import db_client
 from app.schemas import FinalCoachingResponse, TranslationRequest
 from app.agents.orchestrator import OrchestratorAgent
 from app.agents.simulator import SimulatorAgent, SimulatorResponse
@@ -26,6 +26,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from app.mcp_server import mcp
+app.mount("/mcp", mcp.sse_app())
 
 # Instantiate orchestrator and simulator agents
 orchestrator = OrchestratorAgent()
@@ -52,9 +55,7 @@ ARTHUR_PROFILE = {
 }
 
 def init_db():
-    conn = sqlite3.connect(settings.db_path)
-    cursor = conn.cursor()
-    cursor.execute("""
+    db_client.execute("""
         CREATE TABLE IF NOT EXISTS patients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL,
@@ -64,11 +65,10 @@ def init_db():
             background TEXT
         )
     """)
-    conn.commit()
 
     # Seed Maria
-    cursor.execute("SELECT COUNT(*) FROM patients WHERE name = ?", ("Maria",))
-    if cursor.fetchone()[0] == 0:
+    row = db_client.fetchone("SELECT COUNT(*) FROM patients WHERE name = ?", ("Maria",))
+    if row and list(row.values())[0] == 0:
         # Try to load existing JSON file to migrate Maria's data
         maria_profile = DEFAULT_PROFILE
         if os.path.exists(PATIENT_FILE):
@@ -79,7 +79,7 @@ def init_db():
                         maria_profile = temp_profile
             except Exception:
                 pass
-        cursor.execute("""
+        db_client.execute("""
             INSERT INTO patients (name, dementia_type, triggers, preferences, background)
             VALUES (?, ?, ?, ?, ?)
         """, (
@@ -89,12 +89,11 @@ def init_db():
             json.dumps(maria_profile["preferences"]),
             maria_profile["background"]
         ))
-        conn.commit()
 
     # Seed Arthur
-    cursor.execute("SELECT COUNT(*) FROM patients WHERE name = ?", ("Arthur",))
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("""
+    row = db_client.fetchone("SELECT COUNT(*) FROM patients WHERE name = ?", ("Arthur",))
+    if row and list(row.values())[0] == 0:
+        db_client.execute("""
             INSERT INTO patients (name, dementia_type, triggers, preferences, background)
             VALUES (?, ?, ?, ?, ?)
         """, (
@@ -104,9 +103,6 @@ def init_db():
             json.dumps(ARTHUR_PROFILE["preferences"]),
             ARTHUR_PROFILE["background"]
         ))
-        conn.commit()
-
-    conn.close()
 
 # Run database initialization
 init_db()
@@ -117,15 +113,10 @@ except Exception as e:
 
 def load_patient_profile(name: Optional[str] = None) -> dict:
     try:
-        conn = sqlite3.connect(settings.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
         if name:
-            cursor.execute("SELECT name, dementia_type, triggers, preferences, background FROM patients WHERE name = ?", (name,))
+            row = db_client.fetchone("SELECT name, dementia_type, triggers, preferences, background FROM patients WHERE name = ?", (name,))
         else:
-            cursor.execute("SELECT name, dementia_type, triggers, preferences, background FROM patients ORDER BY id ASC LIMIT 1")
-        row = cursor.fetchone()
-        conn.close()
+            row = db_client.fetchone("SELECT name, dementia_type, triggers, preferences, background FROM patients ORDER BY id ASC LIMIT 1")
         if row:
             return {
                 "name": row["name"],
@@ -135,17 +126,12 @@ def load_patient_profile(name: Optional[str] = None) -> dict:
                 "background": row["background"]
             }
     except Exception as e:
-        print(f"Error loading patient profile from SQLite: {e}")
+        print(f"Error loading patient profile: {e}")
     return DEFAULT_PROFILE
 
 def load_all_patients() -> list:
     try:
-        conn = sqlite3.connect(settings.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT name, dementia_type, triggers, preferences, background FROM patients")
-        rows = cursor.fetchall()
-        conn.close()
+        rows = db_client.fetchall("SELECT name, dementia_type, triggers, preferences, background FROM patients")
         return [
             {
                 "name": r["name"],
@@ -157,18 +143,14 @@ def load_all_patients() -> list:
             for r in rows
         ]
     except Exception as e:
-        print(f"Error loading all patients from SQLite: {e}")
+        print(f"Error loading all patients: {e}")
     return [DEFAULT_PROFILE]
 
 def save_patient_profile(profile: dict):
     try:
-        conn = sqlite3.connect(settings.db_path)
-        cursor = conn.cursor()
-        # Check if a patient with this name already exists
-        cursor.execute("SELECT id FROM patients WHERE name = ?", (profile.get("name"),))
-        row = cursor.fetchone()
+        row = db_client.fetchone("SELECT id FROM patients WHERE name = ?", (profile.get("name"),))
         if row:
-            cursor.execute("""
+            db_client.execute("""
                 UPDATE patients
                 SET dementia_type = ?, triggers = ?, preferences = ?, background = ?
                 WHERE id = ?
@@ -177,10 +159,10 @@ def save_patient_profile(profile: dict):
                 json.dumps(profile.get("triggers", [])),
                 json.dumps(profile.get("preferences", [])),
                 profile.get("background"),
-                row[0]
+                list(row.values())[0]
             ))
         else:
-            cursor.execute("""
+            db_client.execute("""
                 INSERT INTO patients (name, dementia_type, triggers, preferences, background)
                 VALUES (?, ?, ?, ?, ?)
             """, (
@@ -190,10 +172,8 @@ def save_patient_profile(profile: dict):
                 json.dumps(profile.get("preferences", [])),
                 profile.get("background")
             ))
-        conn.commit()
-        conn.close()
     except Exception as e:
-        print(f"Error saving patient profile to SQLite: {e}")
+        print(f"Error saving patient profile: {e}")
 
 # HTTP Request Schemas
 class PatientProfileSchema(BaseModel):

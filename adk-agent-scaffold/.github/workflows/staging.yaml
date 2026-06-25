@@ -61,13 +61,19 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      - name: Fetch Backend URL
+        id: fetch-backend
+        run: |
+          URL=$(gcloud run services describe ${{ vars.STAGING_PROJECT_ID }}-backend --platform managed --region ${{ vars.REGION }} --format="value(status.url)" 2>/dev/null || echo "http://localhost:8000")
+          echo "backend_url=${URL}" >> $GITHUB_OUTPUT
+
       - name: Deploy to Staging (Agent Runtime)
         run: |
           uvx google-agents-cli deploy \
             --project ${{ vars.STAGING_PROJECT_ID }} \
             --region ${{ vars.REGION }} \
             --service-account=${{ vars.APP_SERVICE_ACCOUNT_STAGING }} \
-            --update-env-vars="COMMIT_SHA=${{ github.sha }},LOGS_BUCKET_NAME=${{ vars.LOGS_BUCKET_NAME_STAGING }}"
+            --update-env-vars="COMMIT_SHA=${{ github.sha }},LOGS_BUCKET_NAME=${{ vars.LOGS_BUCKET_NAME_STAGING }},BACKEND_URL=${{ steps.fetch-backend.outputs.backend_url }}"
 
       - name: Fetch Auth Token
         id: fetch-token

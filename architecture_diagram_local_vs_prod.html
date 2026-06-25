@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local vs Production Decoupled Architectures</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --border-color: rgba(255, 255, 255, 0.06);
+            --text-color: #f3f4f6;
+            --text-muted: #9ca3af;
+            --accent-color: #38bdf8;
+            --glow-color: rgba(56, 189, 248, 0.1);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        header {
+            margin-top: 30px;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.3rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #ffffff 40%, #38bdf8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 1rem;
+            max-width: 600px;
+            margin: 0 auto 30px auto;
+            line-height: 1.5;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            width: 95%;
+            max-width: 1400px;
+            margin-bottom: 50px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2),
+                        0 0 40px var(--glow-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .card h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 6px;
+            color: var(--accent-color);
+        }
+
+        .card p.desc {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            text-align: center;
+            margin-bottom: 25px;
+            max-width: 450px;
+            line-height: 1.4;
+        }
+
+        .mermaid {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        .footer {
+            margin-bottom: 30px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+    </style>
+    <!-- Include Mermaid JS from CDN -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                background: '#111827',
+                primaryColor: '#0369a1',
+                primaryTextColor: '#f3f4f6',
+                lineColor: '#38bdf8',
+                secondaryColor: '#0b0f19',
+                tertiaryColor: '#1f2937'
+            }
+        });
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Local vs Production Decoupled Architectures</h1>
+        <p class="subtitle">Comparing the offline multi-container configuration with the cloud serverless/managed Google Cloud stack.</p>
+    </header>
+
+    <div class="grid">
+        <!-- Local Development Card -->
+        <div class="card">
+            <h2>Local Development (Docker Compose)</h2>
+            <p class="desc">The Web App runs all agent logic locally. A separate ADK Agent Playground can be run locally for testing, connecting to FastMCP over SSE.</p>
+            <div class="mermaid">
+                graph TD
+                    subgraph User Host
+                        subgraph docker-compose [Docker Compose Network]
+                            UI[Frontend UI: Port 80]
+                            API[Backend API & FastMCP: Port 8000]
+                            DB[(Local SQLite DB)]
+                            RAG[(Local ChromaDB)]
+                        end
+
+                        Playground[ADK Agent: Local Playground]
+                    end
+
+                    %% Web App Flow
+                    UI -->|1. HTTP Requests| API
+                    API -->|2. Local Agent Orchestration| API
+                    API -->|3. Query Patient Profiles| DB
+                    API -->|4. Query Care Guidelines| RAG
+
+                    %% Agent Playground Flow
+                    Playground -.->|MCP SSE Requests| API
+            </div>
+        </div>
+
+        <!-- Production Cloud Card -->
+        <div class="card">
+            <h2>Production Environment (Google Cloud)</h2>
+            <p class="desc">Decoupled 5-service cloud stack. The Backend API invokes the Agent (Reasoning Engine), which queries the Datastore natively and pulls DB records via FastMCP SSE.</p>
+            <div class="mermaid">
+                graph TD
+                    subgraph "Google Cloud Platform (GCP)"
+                        subgraph Client Facing Services
+                            UI[Frontend UI: Cloud Run]
+                            API[Backend API & FastMCP: Cloud Run]
+                        end
+
+                        subgraph Vertex AI Layer
+                            Agent[ADK Agent: Reasoning Engine]
+                            Datastore[Vertex AI Search Datastore]
+                        end
+
+                        subgraph Stateful Managed Services
+                            DB[(Cloud SQL: PostgreSQL)]
+                            RAG[(ChromaDB: Standalone Cloud Run)]
+                        end
+                    end
+
+                    %% Communications
+                    UI -->|1. HTTPS Requests| API
+                    API -->|2. Invoke Agent: Vertex AI SDK| Agent
+                    Agent -->|3. MCP SSE Tool Call| API
+                    Agent -->|4. Native RAG Search| Datastore
+                    API -->|5. Query DB via Cloud SQL Auth Proxy| DB
+                    API -->|6. Query Guidelines (UI Library/Seed)| RAG
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Open this file in your web browser to view the side-by-side diagrams.
+    </div>
+</body>
+</html>

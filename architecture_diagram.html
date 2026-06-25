@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DementiaCare Coach Decoupled Architecture Diagram</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-color: #38bdf8;
+            --glow-color: rgba(56, 189, 248, 0.15);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        header {
+            margin-top: 40px;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #f8fafc 30%, #38bdf8 90%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            max-width: 600px;
+            line-height: 1.6;
+            margin: 0 auto 30px auto;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1000px;
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3),
+                        0 0 50px var(--glow-color);
+            margin-bottom: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4),
+                        0 0 60px rgba(56, 189, 248, 0.25);
+        }
+
+        .mermaid {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        .footer {
+            margin-bottom: 40px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+    </style>
+    <!-- Include Mermaid JS from CDN -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                background: '#1e293b',
+                primaryColor: '#0369a1',
+                primaryTextColor: '#f8fafc',
+                lineColor: '#38bdf8',
+                secondaryColor: '#0f172a',
+                tertiaryColor: '#1e293b'
+            }
+        });
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Decoupled Architecture Diagram</h1>
+        <p class="subtitle">Visual representation of the 5-service decoupled production stack with FastMCP and SSE connectivity.</p>
+    </header>
+
+    <div class="container">
+        <div class="mermaid">
+            graph TD
+                subgraph Client Layer
+                    UI[Frontend UI: React + Vite / Nginx]
+                end
+
+                subgraph GCP Vertex AI
+                    Agent[ADK Agent: Vertex AI Reasoning Engine]
+                    Datastore[Vertex AI Search Datastore]
+                end
+
+                subgraph Backend Service Layer
+                    API[Backend API: FastAPI]
+                    MCP[FastMCP Server: /mcp/sse]
+
+                    API --- MCP
+                end
+
+                subgraph Data & RAG Layer
+                    DB[(Database: PostgreSQL / SQLite)]
+                    RAG[(Local RAG: ChromaDB Server / Local Store)]
+                end
+
+                %% Communications
+                UI -->|HTTP Requests| API
+                Agent -->|1. Tool Requests: MCP Client over SSE| MCP
+                Agent -->|2. Native RAG Search| Datastore
+                MCP -->|Queries Patient Data| DB
+                API -->|Queries Patient Data| DB
+                API -->|Queries Guidelines| RAG
+        </div>
+    </div>
+
+    <div class="footer">
+        Open this file in your web browser to view the interactive diagram.
+    </div>
+</body>
+</html>

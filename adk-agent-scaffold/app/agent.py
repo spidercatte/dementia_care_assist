@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
+import asyncio
 import os
 
 import google.auth
@@ -20,6 +20,8 @@ from google.adk.agents import Agent
 from google.adk.apps import App
 from google.adk.models import Gemini
 from google.genai import types
+from mcp import ClientSession
+from mcp.client.sse import sse_client
 
 # Configure Google Cloud environment settings
 if os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "True").lower() == "true":
@@ -34,79 +36,48 @@ else:
     os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "False"
 
 # ====================================================
-# ADK Agent Tools
+# ADK Agent Tools & FastMCP Client
 # ====================================================
 
 
+def call_mcp_tool(name: str, arguments: dict | None = None) -> str:
+    """Helper to synchronously execute an MCP tool on the remote backend server over SSE."""
+    backend_url = os.environ.get("BACKEND_URL", "http://localhost:8000")
+    if arguments is None:
+        arguments = {}
+
+    async def _async_call():
+        # Establish connection to backend's FastMCP SSE endpoint
+        async with sse_client(f"{backend_url}/mcp/sse") as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(name, arguments=arguments)
+                return result.content[0].text
+
+    try:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import nest_asyncio
+
+            nest_asyncio.apply()
+            return asyncio.run(_async_call())
+        else:
+            return asyncio.run(_async_call())
+    except Exception as e:
+        return f"Error executing MCP tool '{name}': {e}"
+
+
 def get_patient_profile() -> str:
-    """Retrieves the active patient's background, dementia staging, triggers, preferences, and daily constraints.
+    """Retrieves the active patient's background, dementia staging, triggers, preferences, and daily constraints from the database.
 
     Returns:
         A formatted JSON string of the patient's profile context.
     """
-    # Mocking the JSON database lookup for the ADK agent context
-    profile = {
-        "name": "Maria",
-        "dementia_type": "Alzheimer's (Moderate Stage)",
-        "triggers": [
-            "direct correction",
-            "being rushed",
-            "loud noises",
-            "asking 'do you remember?'",
-        ],
-        "preferences": [
-            "listening to 1950s big band music",
-            "drinking chamomile tea",
-            "talking about her past work as a gardener",
-        ],
-        "background": "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the late afternoon (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her.",
-    }
-    return json.dumps(profile, indent=2)
-
-
-def lookup_dementia_guidelines(query: str) -> str:
-    """Search the clinical guidelines database for dementia care protocols and validation therapy techniques.
-
-    Args:
-        query: 2-3 keywords describing the behavioral symptom (e.g. 'medication refusal', 'shower resistance', 'sundowning').
-
-    Returns:
-        A string containing relevant care guidelines and evidence-based protocols.
-    """
-    q = query.lower()
-    # Mocking Vector RAG search matching inside the ADK agent context
-    if any(k in q for k in ["med", "pill", "tablet"]):
-        return (
-            "Guideline: Handling Medication Refusal\n"
-            "When a dementia patient refuses medication, never argue, force, or lecture them. "
-            "Instead, validate their feelings by saying: 'I understand you're tired of taking these pills, they do look big.' "
-            "Redirect their attention to a pleasant topic or routine. Pair medication with a treat or favorite food: "
-            "'Let's have a cookie first, then we can take this to help you feel strong.' "
-            "Avoid logical explanations or saying 'the doctor ordered it', as logic often escalates agitation in dementia."
-        )
-    elif any(k in q for k in ["shower", "bath", "wash", "dirty", "clean"]):
-        return (
-            "Guideline: Managing Agitation and Resistance during Personal Care\n"
-            "Resistance to bathing or dressing is often caused by feeling cold, exposed, or confused. "
-            "Keep the environment warm, drape a towel over their shoulders for privacy, and explain each step in simple, positive words. "
-            "Use Teepa Snow's Positive Physical Approach: approach from the front, call their name, slide hand into a hand-shake grip, "
-            "stand at their side (not directly in front, which is confrontational), and speak in a low, gentle voice."
-        )
-    elif any(k in q for k in ["home", "mother", "suitcase", "leave"]):
-        return (
-            "Guideline: Responding to Repetitive Questions and Wanting to Go Home\n"
-            "When a patient repeatedly asks to 'go home' or asks for a deceased relative, do not correct them or tell them their parents are dead. "
-            "This causes fresh grief and distress. Instead, use Validation Therapy to address the emotional need behind the words. "
-            "Say: 'You are thinking about home/your mom. Tell me about your childhood home.' "
-            "Once they are engaged in sharing memories, transition/redirect their attention to a comforting current activity: "
-            "'That sounds beautiful. Let's have a cup of warm tea while we fold these towels.'"
-        )
-    return (
-        "Guideline: Validation Therapy over Reality Orientation\n"
-        "Reality orientation (correcting mistakes like 'No, you don't work here anymore') "
-        "almost always fails and triggers anger, fear, or shame. Validation Therapy focuses on validating the emotional truth of their statement. "
-        "Acknowledge their pride and capability, then redirect them to a helper task in their current environment."
-    )
+    return call_mcp_tool("get_patient_profile")
 
 
 def log_safety_escalation(urgency_level: str, safety_reason: str) -> str:
@@ -119,8 +90,9 @@ def log_safety_escalation(urgency_level: str, safety_reason: str) -> str:
     Returns:
         A confirmation string stating that the safety alert was captured.
     """
-    return (
-        f"[SAFETY ESCALATION LOGGED] Urgency: {urgency_level} | Detail: {safety_reason}"
+    return call_mcp_tool(
+        "log_safety_escalation",
+        {"urgency_level": urgency_level, "safety_reason": safety_reason},
     )
 
 
@@ -139,7 +111,7 @@ root_agent = Agent(
         "and evidence-based coaching to dementia caregivers.\n\n"
         "When a caregiver describes an interaction, always follow this protocol:\n"
         "1. Retrieve the patient's context using get_patient_profile() to check their stage and active triggers.\n"
-        "2. Query relevant care guidelines using lookup_dementia_guidelines() for the behaviors displayed.\n"
+        "2. Query relevant care guidelines for the behaviors displayed (use your native RAG datastore tool).\n"
         "3. If there are safety hazards (e.g. falls, medication danger, severe pacing, wandering), log it using log_safety_escalation().\n"
         "4. Synthesize the findings and output caregiver feedback. Provide:\n"
         "   - An emotional behavioral analysis summary.\n"
@@ -149,7 +121,7 @@ root_agent = Agent(
         "   - Clear clinical guidelines and recommendations.\n\n"
         "Do not offer dry medical summaries; be highly actionable, supportive, and kind."
     ),
-    tools=[get_patient_profile, lookup_dementia_guidelines, log_safety_escalation],
+    tools=[get_patient_profile, log_safety_escalation],
 )
 
 app = App(

@@ -49,6 +49,11 @@ class GeminiEmbeddingFunction(EmbeddingFunction):
             return embeddings
 
 def get_chroma_client():
+    if settings.chroma_server_host:
+        return chromadb.HttpClient(
+            host=settings.chroma_server_host,
+            port=settings.chroma_server_port
+        )
     return chromadb.PersistentClient(path=settings.chroma_db_path)
 
 def get_collection():
