@@ -29,7 +29,7 @@ import {
   Moon
 } from 'lucide-react';
 
-const BACKEND_URL = 'http://localhost:8000';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
 // Mock data fallbacks for demonstration when backend is offline
 const MOCK_PATIENT = {

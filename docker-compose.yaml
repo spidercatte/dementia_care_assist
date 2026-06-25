@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - dementia-care-data:/app/data
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DB_PATH=/app/data/dementia_care.db
+      - CHROMA_DB_PATH=/app/data/chroma_db
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_BACKEND_URL=http://localhost:8000
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  dementia-care-data:

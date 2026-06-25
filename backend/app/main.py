@@ -110,6 +110,10 @@ def init_db():
 
 # Run database initialization
 init_db()
+try:
+    seed_default_guidelines()
+except Exception as e:
+    print(f"Failed to auto-seed guidelines on startup: {e}")
 
 def load_patient_profile(name: Optional[str] = None) -> dict:
     try:

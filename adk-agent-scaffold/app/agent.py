@@ -12,26 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import datetime
-from zoneinfo import ZoneInfo
-import os
 import json
-import google.auth
+import os
 
+import google.auth
 from google.adk.agents import Agent
 from google.adk.apps import App
 from google.adk.models import Gemini
 from google.genai import types
 
 # Configure Google Cloud environment settings
-_, project_id = google.auth.default()
-os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
-os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
-os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
+if os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "True").lower() == "true":
+    try:
+        _, project_id = google.auth.default()
+        os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
+    except Exception:
+        pass
+    os.environ.setdefault("GOOGLE_CLOUD_LOCATION", "us-central1")
+    os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
+else:
+    os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "False"
 
 # ====================================================
 # ADK Agent Tools
 # ====================================================
+
 
 def get_patient_profile() -> str:
     """Retrieves the active patient's background, dementia staging, triggers, preferences, and daily constraints.
@@ -43,9 +48,18 @@ def get_patient_profile() -> str:
     profile = {
         "name": "Maria",
         "dementia_type": "Alzheimer's (Moderate Stage)",
-        "triggers": ["direct correction", "being rushed", "loud noises", "asking 'do you remember?'"],
-        "preferences": ["listening to 1950s big band music", "drinking chamomile tea", "talking about her past work as a gardener"],
-        "background": "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the late afternoon (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her."
+        "triggers": [
+            "direct correction",
+            "being rushed",
+            "loud noises",
+            "asking 'do you remember?'",
+        ],
+        "preferences": [
+            "listening to 1950s big band music",
+            "drinking chamomile tea",
+            "talking about her past work as a gardener",
+        ],
+        "background": "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the late afternoon (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her.",
     }
     return json.dumps(profile, indent=2)
 
@@ -105,7 +119,9 @@ def log_safety_escalation(urgency_level: str, safety_reason: str) -> str:
     Returns:
         A confirmation string stating that the safety alert was captured.
     """
-    return f"[SAFETY ESCALATION LOGGED] Urgency: {urgency_level} | Detail: {safety_reason}"
+    return (
+        f"[SAFETY ESCALATION LOGGED] Urgency: {urgency_level} | Detail: {safety_reason}"
+    )
 
 
 # ====================================================
@@ -116,7 +132,6 @@ root_agent = Agent(
     name="dementiacare_coach_agent",
     model=Gemini(
         model="gemini-2.0-flash",
-        api_key=os.environ.get("GEMINI_API_KEY", "mock-key-value-12345"),
         retry_options=types.HttpRetryOptions(attempts=3),
     ),
     instruction=(
