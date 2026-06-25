@@ -2,8 +2,12 @@ import os
 import json
 import shutil
 import tempfile
+import time
+from collections import defaultdict
 from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status, Security, Depends, Request
+from fastapi.responses import JSONResponse
+from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -16,6 +20,62 @@ from app.agents.simulator import SimulatorAgent, SimulatorResponse
 from app.rag import seed_default_guidelines
 from app.mock_responses import get_mock_translation
 
+# Rate Limiter implementation
+class RateLimiter:
+    def __init__(self, requests_limit: int = 60, window_seconds: int = 60):
+        self.limit = requests_limit
+        self.window = window_seconds
+        self.requests = defaultdict(list)
+
+    def is_allowed(self, client_ip: str) -> bool:
+        now = time.time()
+        self.requests[client_ip] = [t for t in self.requests[client_ip] if now - t < self.window]
+        if len(self.requests[client_ip]) >= self.limit:
+            return False
+        self.requests[client_ip].append(now)
+        return True
+
+rate_limiter = RateLimiter(requests_limit=60, window_seconds=60)
+
+# API Key & RBAC validation
+API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+def verify_user_key(api_key: Optional[str] = Security(API_KEY_HEADER)):
+    if not settings.admin_api_key and not settings.user_api_key:
+        return
+    if api_key in (settings.admin_api_key, settings.user_api_key) and api_key != "":
+        return
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Missing or invalid User Access Key"
+    )
+
+def verify_admin_key(api_key: Optional[str] = Security(API_KEY_HEADER)):
+    if not settings.admin_api_key:
+        return
+    if api_key == settings.admin_api_key and api_key != "":
+        return
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Missing or invalid Admin Access Key"
+    )
+
+def cleanup_old_gemini_files():
+    if not settings.gemini_api_key:
+        return
+    try:
+        from google import genai
+        client = genai.Client(api_key=settings.gemini_api_key)
+        print("[Startup] Scanning Gemini File API for orphaned files...", flush=True)
+        for f in client.files.list():
+            try:
+                print(f"[Startup] Deleting orphaned file: {f.name}", flush=True)
+                client.files.delete(name=f.name)
+            except Exception as delete_err:
+                print(f"[Startup] Failed to delete file {f.name}: {delete_err}", flush=True)
+    except Exception as e:
+        print(f"[Startup] Gemini File API cleanup error: {e}", flush=True)
+
 app = FastAPI(title=settings.app_name)
 
 # Configure CORS
@@ -26,6 +86,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def rate_limiting_middleware(request: Request, call_next):
+    client_ip = request.client.host if request.client else "unknown"
+    if request.url.path != "/health" and not request.url.path.startswith("/mcp") and not rate_limiter.is_allowed(client_ip):
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={"detail": "Too many requests. Please try again later."}
+        )
+    return await call_next(request)
 
 from app.mcp_server import mcp
 app.mount("/mcp", mcp.sse_app())
@@ -110,6 +180,10 @@ try:
     seed_default_guidelines()
 except Exception as e:
     print(f"Failed to auto-seed guidelines on startup: {e}")
+try:
+    cleanup_old_gemini_files()
+except Exception as e:
+    print(f"Failed to run Gemini File API startup cleanup: {e}")
 
 def load_patient_profile(name: Optional[str] = None) -> dict:
     try:
@@ -202,43 +276,45 @@ def health_check():
     }
 
 @app.get("/patients", response_model=List[PatientProfileSchema])
-def get_all_patients_endpoint():
+def get_all_patients_endpoint(api_key: Optional[str] = Depends(verify_user_key)):
     return load_all_patients()
 
 @app.get("/patient", response_model=PatientProfileSchema)
-def get_patient(name: Optional[str] = None):
+def get_patient(name: Optional[str] = None, api_key: Optional[str] = Depends(verify_user_key)):
     return load_patient_profile(name)
 
 @app.post("/patient", response_model=PatientProfileSchema)
-def update_patient(profile: PatientProfileSchema):
+def update_patient(profile: PatientProfileSchema, api_key: Optional[str] = Depends(verify_user_key)):
     save_patient_profile(profile.model_dump())
     return profile
 
 @app.post("/guidelines/seed")
-def seed_guidelines():
+def seed_guidelines(api_key: Optional[str] = Depends(verify_admin_key)):
     try:
         seed_default_guidelines()
         return {"status": "success", "message": "Guidelines collection seeded successfully."}
     except Exception as e:
+        print(f"[Error] Guidelines seeding failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Seeding failed: {str(e)}"
+            detail="Seeding failed. Please check backend logs."
         )
 
 @app.post("/analyze/text", response_model=FinalCoachingResponse)
-def analyze_text(request: TextAnalysisRequest):
+def analyze_text(request: TextAnalysisRequest, api_key: Optional[str] = Depends(verify_user_key)):
     patient_profile = load_patient_profile(request.patient_name)
     try:
         feedback = orchestrator.analyze_text(request.description, patient_profile)
         return feedback
     except Exception as e:
+        print(f"[Error] Text analysis failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Analysis failed: {str(e)}"
+            detail="Analysis pipeline failed. Please check backend logs."
         )
 
 @app.post("/analyze/file", response_model=FinalCoachingResponse)
-def analyze_file(file: UploadFile = File(...), patient_name: Optional[str] = Form(None)):
+def analyze_file(file: UploadFile = File(...), patient_name: Optional[str] = Form(None), api_key: Optional[str] = Depends(verify_user_key)):
     patient_profile = load_patient_profile(patient_name)
 
     # Save uploaded file to a temporary file
@@ -256,9 +332,10 @@ def analyze_file(file: UploadFile = File(...), patient_name: Optional[str] = For
         )
         return feedback
     except Exception as e:
+        print(f"[Error] File analysis failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"File analysis failed: {str(e)}"
+            detail="File analysis pipeline failed. Please check backend logs."
         )
     finally:
         # Clean up local temporary file
@@ -269,7 +346,7 @@ def analyze_file(file: UploadFile = File(...), patient_name: Optional[str] = For
                 pass
 
 @app.post("/translate", response_model=FinalCoachingResponse)
-def translate_feedback(request: TranslationRequest):
+def translate_feedback(request: TranslationRequest, api_key: Optional[str] = Depends(verify_user_key)):
     if orchestrator.use_mock or not orchestrator.client:
         return get_mock_translation(request.coaching_response, request.target_language)
 
@@ -293,10 +370,11 @@ def translate_feedback(request: TranslationRequest):
         )
         return FinalCoachingResponse.model_validate_json(response.text)
     except Exception as e:
+        print(f"[Error] Translation failed: {e}")
         return get_mock_translation(request.coaching_response, request.target_language)
 
 @app.post("/simulator/step", response_model=SimulatorResponse)
-def simulator_step(request: SimulatorRequest):
+def simulator_step(request: SimulatorRequest, api_key: Optional[str] = Depends(verify_user_key)):
     patient_profile = load_patient_profile(request.patient_name)
     try:
         response = simulator.run(
@@ -306,7 +384,8 @@ def simulator_step(request: SimulatorRequest):
         )
         return response
     except Exception as e:
+        print(f"[Error] Simulation failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Simulation failed: {str(e)}"
+            detail="Simulation step failed. Please check backend logs."
         )

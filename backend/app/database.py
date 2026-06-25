@@ -17,7 +17,17 @@ class DatabaseClient:
         if not self.db_url:
             self.db_url = os.environ.get("DATABASE_URL", "")
 
-        self.is_postgres = self.db_url.startswith("postgresql://") or self.db_url.startswith("postgres://")
+        self.db_user = getattr(settings, "db_user", "") or os.environ.get("DB_USER", "")
+        self.db_password = getattr(settings, "db_password", "") or os.environ.get("DB_PASSWORD", "")
+        self.db_host = getattr(settings, "db_host", "") or os.environ.get("DB_HOST", "")
+        self.db_port = getattr(settings, "db_port", 5432) or int(os.environ.get("DB_PORT", "5432"))
+        self.db_name = getattr(settings, "db_name", "") or os.environ.get("DB_NAME", "")
+
+        self.is_postgres = (
+            self.db_url.startswith("postgresql://") or
+            self.db_url.startswith("postgres://") or
+            bool(self.db_user and self.db_name)
+        )
 
         if self.is_postgres and psycopg2 is None:
             raise ImportError(
@@ -27,13 +37,23 @@ class DatabaseClient:
 
     def _get_connection(self):
         if self.is_postgres:
-            # Parse connection URL for psycopg2
-            result = urllib.parse.urlparse(self.db_url)
-            username = result.username
-            password = result.password
-            database = result.path[1:]
-            hostname = result.hostname
-            port = result.port or 5432
+            if self.db_url:
+                # Parse connection URL for psycopg2
+                result = urllib.parse.urlparse(self.db_url)
+                username = result.username
+                password = result.password
+                database = result.path[1:]
+
+                # Parse query parameters to support Unix socket (e.g. host=/cloudsql/instance)
+                query_params = urllib.parse.parse_qs(result.query)
+                hostname = query_params.get("host", [None])[0] or result.hostname
+                port = result.port or 5432
+            else:
+                username = self.db_user
+                password = self.db_password
+                database = self.db_name
+                hostname = self.db_host
+                port = self.db_port
 
             return psycopg2.connect(
                 database=database,
@@ -46,6 +66,7 @@ class DatabaseClient:
             conn = sqlite3.connect(settings.db_path)
             conn.row_factory = sqlite3.Row
             return conn
+
 
     def _format_query(self, query: str) -> str:
         if self.is_postgres:

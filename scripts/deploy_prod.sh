@@ -93,6 +93,9 @@ terraform init
 
 echo "--> Applying PostgreSQL and Backend Cloud Run configurations..."
 terraform apply \
+    -target=google_service_account.app_sa \
+    -target=google_project_iam_member.app_sa_roles \
+    -target=google_project_iam_member.app_sa_secret_accessor \
     -target=google_sql_database_instance.postgres \
     -target=google_sql_database.dementia_care_db \
     -target=google_sql_user.db_user \

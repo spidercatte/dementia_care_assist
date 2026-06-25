@@ -93,6 +93,17 @@ resource "google_logging_project_sink" "feedback_logs_to_bq" {
   depends_on = [google_bigquery_dataset.telemetry_dataset]
 }
 
+# Wait for the Log Sink unique writer service account to propagate in IAM
+resource "time_sleep" "wait_for_log_sinks_sa" {
+  for_each        = local.deploy_project_ids
+  create_duration = "20s"
+
+  depends_on = [
+    google_logging_project_sink.genai_logs_to_bq,
+    google_logging_project_sink.feedback_logs_to_bq
+  ]
+}
+
 # Grant log sink service accounts write access to the BigQuery dataset
 resource "google_bigquery_dataset_iam_member" "genai_logs_bq_writer" {
   for_each   = local.deploy_project_ids
@@ -100,6 +111,8 @@ resource "google_bigquery_dataset_iam_member" "genai_logs_bq_writer" {
   dataset_id = google_bigquery_dataset.telemetry_dataset[each.key].dataset_id
   role       = "roles/bigquery.dataEditor"
   member     = google_logging_project_sink.genai_logs_to_bq[each.key].writer_identity
+
+  depends_on = [time_sleep.wait_for_log_sinks_sa]
 }
 
 resource "google_bigquery_dataset_iam_member" "feedback_logs_bq_writer" {
@@ -108,6 +121,8 @@ resource "google_bigquery_dataset_iam_member" "feedback_logs_bq_writer" {
   dataset_id = google_bigquery_dataset.telemetry_dataset[each.key].dataset_id
   role       = "roles/bigquery.dataEditor"
   member     = google_logging_project_sink.feedback_logs_to_bq[each.key].writer_identity
+
+  depends_on = [time_sleep.wait_for_log_sinks_sa]
 }
 
 # ====================================================================

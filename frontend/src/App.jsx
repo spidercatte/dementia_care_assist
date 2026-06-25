@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+const DEFAULT_USER_API_KEY = import.meta.env.VITE_USER_API_KEY || '';
 
 // Mock data fallbacks for demonstration when backend is offline
 const MOCK_PATIENT = {
@@ -153,6 +154,68 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [backendStatus, setBackendStatus] = useState('checking'); // checking, online, offline
   const [isSeeding, setIsSeeding] = useState(false);
+
+  // Authentication State
+  const [apiKey, setApiKey] = useState(() => {
+    return localStorage.getItem('user_api_key') || DEFAULT_USER_API_KEY;
+  });
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return !DEFAULT_USER_API_KEY || !!localStorage.getItem('user_api_key');
+  });
+  const [loginInput, setLoginInput] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  const secureFetch = async (url, options = {}) => {
+    const headers = {
+      ...options.headers,
+      ...(apiKey ? { 'X-API-Key': apiKey } : {})
+    };
+    try {
+      const res = await fetch(url, { ...options, headers });
+      if (res.status === 401) {
+        localStorage.removeItem('user_api_key');
+        setApiKey('');
+        setIsAuthenticated(false);
+        setLoginError('Invalid or expired Access Key. Please try again.');
+      }
+      return res;
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    if (!loginInput.trim()) {
+      setLoginError('Please enter an Access Key.');
+      return;
+    }
+
+    try {
+      const testHeaders = { 'X-API-Key': loginInput.trim() };
+      const res = await fetch(`${BACKEND_URL}/patients`, { headers: testHeaders });
+      if (res.ok) {
+        localStorage.setItem('user_api_key', loginInput.trim());
+        setApiKey(loginInput.trim());
+        setIsAuthenticated(true);
+        setLoginInput('');
+        setLoginError('');
+        // Reload data
+        loadPatientData();
+      } else {
+        setLoginError('Invalid Access Key. Access denied.');
+      }
+    } catch (err) {
+      setLoginError('Connection failed: ' + err.message);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('user_api_key');
+    setApiKey('');
+    setIsAuthenticated(false);
+  };
 
   // Patient Profile State
   const [patient, setPatient] = useState(MOCK_PATIENT);
@@ -295,7 +358,7 @@ function App() {
 
   const checkBackendHealth = async () => {
     try {
-      const res = await fetch(`${BACKEND_URL}/health`);
+      const res = await secureFetch(`${BACKEND_URL}/health`);
       if (res.ok) {
         setBackendStatus('online');
       } else {
@@ -308,7 +371,7 @@ function App() {
 
   const loadPatientData = async () => {
     try {
-      const listRes = await fetch(`${BACKEND_URL}/patients`);
+      const listRes = await secureFetch(`${BACKEND_URL}/patients`);
       if (listRes.ok) {
         const listData = await listRes.json();
         setPatientsList(listData);
@@ -316,7 +379,7 @@ function App() {
           setPatient(listData[0]);
         }
       } else {
-        const res = await fetch(`${BACKEND_URL}/patient`);
+        const res = await secureFetch(`${BACKEND_URL}/patient`);
         if (res.ok) {
           const data = await res.json();
           setPatient(data);
@@ -333,7 +396,7 @@ function App() {
   const handleSwitchPatient = async (name) => {
     if (backendStatus === 'online') {
       try {
-        const res = await fetch(`${BACKEND_URL}/patient?name=${name}`);
+        const res = await secureFetch(`${BACKEND_URL}/patient?name=${name}`);
         if (res.ok) {
           const data = await res.json();
           setPatient(data);
@@ -354,13 +417,13 @@ function App() {
   useEffect(() => {
     checkBackendHealth();
     loadPatientData();
-  }, []);
+  }, [apiKey]); // reload when API Key changes
 
 
   const seedDatabase = async () => {
     setIsSeeding(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/guidelines/seed`, { method: 'POST' });
+      const res = await secureFetch(`${BACKEND_URL}/guidelines/seed`, { method: 'POST' });
       if (res.ok) {
         alert('Dementia care guidelines successfully seeded into vector database!');
       } else {
@@ -381,7 +444,7 @@ function App() {
     setIsSavingProfile(true);
     if (backendStatus === 'online') {
       try {
-        const res = await fetch(`${BACKEND_URL}/patient`, {
+        const res = await secureFetch(`${BACKEND_URL}/patient`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patient)
@@ -476,12 +539,12 @@ function App() {
                     const formData = new FormData();
                     formData.append('file', selectedFile);
                     formData.append('patient_name', patient.name);
-                    res = await fetch(`${BACKEND_URL}/analyze/file`, {
+                    res = await secureFetch(`${BACKEND_URL}/analyze/file`, {
                       method: 'POST',
                       body: formData
                     });
                   } else {
-                    res = await fetch(`${BACKEND_URL}/analyze/text`, {
+                    res = await secureFetch(`${BACKEND_URL}/analyze/text`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ description: inputText, patient_name: patient.name })
@@ -612,7 +675,7 @@ function App() {
     setIsTranslating(true);
     try {
       if (backendStatus === 'online') {
-        const res = await fetch(`${BACKEND_URL}/translate`, {
+        const res = await secureFetch(`${BACKEND_URL}/translate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -670,7 +733,7 @@ function App() {
 
     if (backendStatus === 'online') {
       try {
-        const res = await fetch(`${BACKEND_URL}/simulator/step`, {
+        const res = await secureFetch(`${BACKEND_URL}/simulator/step`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -768,7 +831,7 @@ function App() {
 
     if (backendStatus === 'online') {
       try {
-        const res = await fetch(`${BACKEND_URL}/analyze/text`, { // using text endpoint to get RAG feedback
+        const res = await secureFetch(`${BACKEND_URL}/analyze/text`, { // using text endpoint to get RAG feedback
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ description: ragQuery, patient_name: patient.name })
@@ -840,6 +903,138 @@ function App() {
 
   const displayResult = translatedResult || analysisResult;
 
+  if (!isAuthenticated) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: 'var(--bg-dark)',
+        color: 'var(--text-main)',
+        fontFamily: "'Plus Jakarta Sans', sans-serif",
+        padding: '20px'
+      }}>
+        {/* Floating Theme Toggle */}
+        <div style={{ position: 'absolute', top: '20px', right: '20px' }}>
+          <button
+            onClick={toggleTheme}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0.5rem',
+              borderRadius: '8px',
+              color: 'var(--text-muted)'
+            }}
+          >
+            {theme === 'dark' ? <Sun size={24} /> : <Moon size={24} />}
+          </button>
+        </div>
+
+        {/* Card */}
+        <div style={{
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '16px',
+          padding: '40px',
+          maxWidth: '450px',
+          width: '100%',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.15)',
+          textAlign: 'center',
+          backdropFilter: 'blur(16px)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+            <div style={{
+              background: 'rgba(6, 182, 212, 0.1)',
+              padding: '16px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Activity style={{ color: 'var(--primary)' }} size={48} />
+            </div>
+          </div>
+
+          <h2 style={{ fontSize: '1.8rem', fontWeight: '800', margin: '0 0 8px 0', background: 'linear-gradient(135deg, var(--text-main) 30%, var(--primary) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            DementiaCare Coach
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', margin: '0 0 30px 0', lineHeight: '1.5' }}>
+            To protect sensitive patient health details, please enter your secure User Access Key below.
+          </p>
+
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', gap: '6px' }}>
+              <label htmlFor="accessKey" style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-muted)' }}>
+                Access Key
+              </label>
+              <input
+                id="accessKey"
+                type="password"
+                value={loginInput}
+                onChange={(e) => setLoginInput(e.target.value)}
+                placeholder="••••••••••••••••"
+                style={{
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  background: 'rgba(15, 23, 42, 0.6)',
+                  color: 'var(--text-main)',
+                  fontSize: '1rem',
+                  outline: 'none',
+                  transition: 'border-color 0.2s'
+                }}
+              />
+            </div>
+
+            {loginError && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                color: '#ef4444',
+                padding: '10px 14px',
+                borderRadius: '6px',
+                fontSize: '0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                textAlign: 'left'
+              }}>
+                <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              style={{
+                padding: '12px',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)',
+                color: '#0f172a',
+                fontSize: '1rem',
+                fontWeight: '700',
+                cursor: 'pointer',
+                transition: 'opacity 0.2s',
+                marginTop: '10px'
+              }}
+              onMouseOver={(e) => e.target.style.opacity = '0.9'}
+              onMouseOut={(e) => e.target.style.opacity = '1'}
+            >
+              Verify and Access
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-container">
       {/* Header */}
@@ -887,6 +1082,23 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {isAuthenticated && DEFAULT_USER_API_KEY && (
+            <button
+              onClick={handleLogout}
+              className="btn btn-secondary btn-sm"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0.4rem 0.8rem',
+                borderRadius: '8px',
+                fontSize: '0.85rem'
+              }}
+            >
+              Logout
+            </button>
+          )}
+
           <button
             onClick={toggleTheme}
             className="theme-toggle-btn"
