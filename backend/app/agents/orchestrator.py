@@ -4,7 +4,7 @@ from google import genai
 from google.genai import errors
 
 from app.config import settings
-from app.schemas import FinalCoachingResponse
+from app.schemas import FinalCoachingResponse, BehaviorRecognition, Recommendation
 from app.mock_responses import get_mock_coaching_response
 from app.rag import query_guidelines
 
@@ -16,6 +16,66 @@ from app.agents.safety_escalation import SafetyEscalationAgent
 from app.agents.caregiver_coaching import CaregiverCoachingAgent
 
 logger = logging.getLogger("dementiacare-orchestrator")
+
+def is_nonsensical_or_too_short(text: str) -> bool:
+    if not text:
+        return True
+    cleaned = text.strip().lower()
+    # Filter common short/greeting words
+    greetings = {"hi", "hello", "hey", "test", "demo", "help", "please", "okay", "ok", "good morning", "good afternoon", "good evening", "goodbye", "bye", "yo", "sup"}
+    if cleaned in greetings:
+        return True
+    if len(cleaned) < 15:
+        return True
+    # If the text has no spaces (just a single long word/gibberish)
+    if " " not in cleaned and len(cleaned) > 0:
+        return True
+    return False
+
+def get_invalid_input_response(description: str) -> FinalCoachingResponse:
+    return FinalCoachingResponse(
+        observed_behavior="Input Insufficient / Invalid",
+        likely_trigger="N/A - Insufficient description details",
+        caregiver_pattern="N/A",
+        risk_level="LOW",
+        recommended_response=(
+            "Please describe a specific interaction between a caregiver and a patient with dementia. "
+            "To get the best clinical analysis and coaching script, try including:\n"
+            "1. What the patient said or did (their behavior).\n"
+            "2. What might have triggered it (e.g. being rushed, asked to take medication).\n"
+            "3. How the caregiver responded."
+        ),
+        try_saying="Describe a caregiver-patient situation (e.g., 'Mom got angry when asked to take a bath...').",
+        avoid_saying="Using greetings, test keywords, or very short inputs.",
+        safety_note="Please provide a detailed care log or scenario description to see safety warnings.",
+        behavioral_timeline=[],
+        behavior_analysis=BehaviorRecognition(
+            patient_emotion="N/A",
+            patient_triggers=[],
+            caregiver_communication_style="N/A",
+            interaction_summary=f"The input '{description}' is too short or doesn't describe a dementia care interaction."
+        ),
+        strengths=[],
+        opportunities_for_improvement=[],
+        clinical_safety_flags=[],
+        coaching_scripts=[
+            "Avoid: Single word greetings or test phrases.",
+            "Try: Describing what happened, what was said, and what you did."
+        ],
+        recommendations=[
+            Recommendation(
+                strategy_name="Describe the Patient's Action",
+                description="Tell us what the patient did or said (e.g., refused medication, paced around, accused someone of stealing).",
+                rationality="Knowing the patient's behavior allows us to identify the underlying dementia symptoms and emotional needs."
+            ),
+            Recommendation(
+                strategy_name="Describe the Caregiver's Action",
+                description="Tell us what you said or did in response (e.g., explained the schedule, raised voice, agreed with them).",
+                rationality="Analyzing caregiver response patterns helps us identify triggers and suggest alternative, validation-based scripts."
+            )
+        ],
+        detected_language="English"
+    )
 
 class OrchestratorAgent:
     def __init__(self):
@@ -56,6 +116,14 @@ class OrchestratorAgent:
             # Step 1: Interaction Analysis Agent
             analysis = self.analyzer.run(contents)
             logger.info("Step 1 Complete.")
+
+            # Check if the interaction analysis detected invalid/nonsensical content
+            if "insufficient" in analysis.observed_behavior.lower() or "invalid" in analysis.observed_behavior.lower():
+                description_name = "the uploaded file"
+                for item in contents:
+                    if isinstance(item, str):
+                        description_name = f"'{item}'"
+                return get_invalid_input_response(description_name)
 
             # Step 2: Patient Context Agent
             context = self.context_expert.run(patient_profile)
@@ -112,6 +180,8 @@ class OrchestratorAgent:
             return get_mock_coaching_response(description_text)
 
     def analyze_text(self, description: str, patient_profile: dict) -> FinalCoachingResponse:
+        if is_nonsensical_or_too_short(description):
+            return get_invalid_input_response(description)
         return self.run_pipeline(contents=[description], patient_profile=patient_profile)
 
     def analyze_file(self, file_path: str, mime_type: str, patient_profile: dict, original_filename: str = None) -> FinalCoachingResponse:
