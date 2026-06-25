@@ -49,7 +49,7 @@ resource "random_password" "db_password" {
 
 resource "google_sql_database_instance" "postgres" {
   name             = "${var.project_name}-postgres-${random_id.db_name_suffix.hex}"
-  project          = var.prod_project_id
+  project          = var.project_id
   region           = var.region
   database_version = "POSTGRES_15"
 
@@ -68,13 +68,13 @@ resource "google_sql_database_instance" "postgres" {
 resource "google_sql_database" "dementia_care_db" {
   name     = "dementia_care"
   instance = google_sql_database_instance.postgres.name
-  project  = var.prod_project_id
+  project  = var.project_id
 }
 
 resource "google_sql_user" "db_user" {
   name     = "dementia_admin"
   instance = google_sql_database_instance.postgres.name
-  project  = var.prod_project_id
+  project  = var.project_id
   password = random_password.db_password.result
 }
 
@@ -84,7 +84,7 @@ resource "google_sql_user" "db_user" {
 
 resource "google_secret_manager_secret" "db_password" {
   secret_id = "${var.project_name}-db-password"
-  project   = var.prod_project_id
+  project   = var.project_id
   replication {
     auto {}
   }
@@ -97,7 +97,7 @@ resource "google_secret_manager_secret_version" "db_password_version" {
 
 resource "google_secret_manager_secret" "gemini_api_key" {
   secret_id = "${var.project_name}-gemini-api-key"
-  project   = var.prod_project_id
+  project   = var.project_id
   replication {
     auto {}
   }
@@ -110,7 +110,7 @@ resource "google_secret_manager_secret_version" "gemini_api_key_version" {
 
 resource "google_secret_manager_secret" "user_api_key" {
   secret_id = "${var.project_name}-user-api-key"
-  project   = var.prod_project_id
+  project   = var.project_id
   replication {
     auto {}
   }
@@ -123,7 +123,7 @@ resource "google_secret_manager_secret_version" "user_api_key_version" {
 
 resource "google_secret_manager_secret" "admin_api_key" {
   secret_id = "${var.project_name}-admin-api-key"
-  project   = var.prod_project_id
+  project   = var.project_id
   replication {
     auto {}
   }
@@ -135,7 +135,7 @@ resource "google_secret_manager_secret_version" "admin_api_key_version" {
 }
 
 resource "google_project_iam_member" "app_sa_secret_accessor" {
-  project = var.prod_project_id
+  project = var.project_id
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.app_sa.email}"
 }
@@ -146,7 +146,7 @@ resource "google_project_iam_member" "app_sa_secret_accessor" {
 
 resource "google_cloud_run_v2_service" "backend_service" {
   name                = "${var.project_name}-backend"
-  project             = var.prod_project_id
+  project             = var.project_id
   location            = var.region
   deletion_protection = false
 
@@ -154,7 +154,7 @@ resource "google_cloud_run_v2_service" "backend_service" {
     service_account = google_service_account.app_sa.email
 
     containers {
-      image = "gcr.io/${var.prod_project_id}/${var.project_name}-backend:latest"
+      image = "gcr.io/${var.project_id}/${var.project_name}-backend:latest"
 
       ports {
         container_port = 8000
@@ -241,7 +241,7 @@ resource "google_cloud_run_v2_service" "backend_service" {
 
 resource "google_cloud_run_service_iam_member" "backend_invoker" {
   location = google_cloud_run_v2_service.backend_service.location
-  project  = var.prod_project_id
+  project  = var.project_id
   service  = google_cloud_run_v2_service.backend_service.name
   role     = "roles/run.invoker"
   member   = "allUsers"
@@ -253,13 +253,13 @@ resource "google_cloud_run_service_iam_member" "backend_invoker" {
 
 resource "google_cloud_run_v2_service" "frontend_service" {
   name                = "${var.project_name}-frontend"
-  project             = var.prod_project_id
+  project             = var.project_id
   location            = var.region
   deletion_protection = false
 
   template {
     containers {
-      image = "gcr.io/${var.prod_project_id}/${var.project_name}-frontend:latest"
+      image = "gcr.io/${var.project_id}/${var.project_name}-frontend:latest"
 
       ports {
         container_port = 80
@@ -275,7 +275,7 @@ resource "google_cloud_run_v2_service" "frontend_service" {
 
 resource "google_cloud_run_service_iam_member" "frontend_invoker" {
   location = google_cloud_run_v2_service.frontend_service.location
-  project  = var.prod_project_id
+  project  = var.project_id
   service  = google_cloud_run_v2_service.frontend_service.name
   role     = "roles/run.invoker"
   member   = "allUsers"
