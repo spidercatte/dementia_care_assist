@@ -142,7 +142,7 @@ echo "--> Deploying ADK Agent to Vertex AI Reasoning Engine..."
 cd "$WORKSPACE_DIR/adk-agent-scaffold"
 # Set environment variable BACKEND_URL for the deployed agent
 export BACKEND_URL="$BACKEND_URL"
-agents-cli deploy
+agents-cli deploy --no-confirm-project
 
 echo ""
 echo "=== Deployment Completed Successfully! ==="

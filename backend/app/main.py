@@ -361,7 +361,7 @@ def translate_feedback(request: TranslationRequest, api_key: Optional[str] = Dep
             f"JSON object to translate:\n{response_json}"
         )
         response = orchestrator.client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-2.5-flash',
             contents=[prompt],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",

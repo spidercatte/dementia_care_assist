@@ -159,9 +159,7 @@ function App() {
   const [apiKey, setApiKey] = useState(() => {
     return localStorage.getItem('user_api_key') || DEFAULT_USER_API_KEY;
   });
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return !DEFAULT_USER_API_KEY || !!localStorage.getItem('user_api_key');
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [loginInput, setLoginInput] = useState('');
   const [loginError, setLoginError] = useState('');
 
@@ -173,10 +171,7 @@ function App() {
     try {
       const res = await fetch(url, { ...options, headers });
       if (res.status === 401) {
-        localStorage.removeItem('user_api_key');
-        setApiKey('');
-        setIsAuthenticated(false);
-        setLoginError('Invalid or expired Access Key. Please try again.');
+        console.error('API request returned 401 Unauthorized.');
       }
       return res;
     } catch (err) {
@@ -1082,23 +1077,6 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {isAuthenticated && DEFAULT_USER_API_KEY && (
-            <button
-              onClick={handleLogout}
-              className="btn btn-secondary btn-sm"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '0.4rem 0.8rem',
-                borderRadius: '8px',
-                fontSize: '0.85rem'
-              }}
-            >
-              Logout
-            </button>
-          )}
-
           <button
             onClick={toggleTheme}
             className="theme-toggle-btn"

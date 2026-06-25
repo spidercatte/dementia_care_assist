@@ -103,7 +103,7 @@ def log_safety_escalation(urgency_level: str, safety_reason: str) -> str:
 root_agent = Agent(
     name="dementiacare_coach_agent",
     model=Gemini(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         retry_options=types.HttpRetryOptions(attempts=3),
     ),
     instruction=(
