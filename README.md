@@ -213,10 +213,38 @@ Leave `GEMINI_API_KEY` blank to run in **MOCK mode** — the app returns high-fi
 
 ---
 
+## Antigravity Agent Configuration
+
+This project uses the **Antigravity** agent framework. All project skills, hooks, and scripts live in `.agents/`:
+
+```
+.agents/
+├── AGENTS.md          # Project-scoped agent rules (deployment, security)
+├── CONTEXT.md         # Secure coding standards and paved-road patterns
+├── hooks.json         # Pre-tool-use hooks (e.g. validate tool calls before execution)
+├── skills/            # Reusable skills invocable by the agent
+│   ├── dementiacare-run-all/       # Boot the full stack (setup → backend → RAG → frontend)
+│   ├── dementiacare-run-backend/   # Start the FastAPI backend only
+│   ├── dementiacare-run-frontend/  # Start the React frontend only
+│   ├── dementiacare-seed-rag/      # Seed ChromaDB with clinical guidelines
+│   ├── dementiacare-setup/         # Install dependencies
+│   ├── dementiacare-cleanup-ports/ # Kill processes on ports 8000 / 5173
+│   ├── dementiacare-deploy-backend/
+│   ├── dementiacare-deploy-frontend/
+│   └── stride-threat-model/        # Generate a STRIDE threat model
+└── scripts/
+    └── validate_tool_call.py       # Hook script: validate agent tool call inputs
+```
+
+Each skill is self-contained with a `SKILL.md` that describes its steps and purpose.
+
+---
+
 ## Project Structure
 
 ```
 dementia_care/
+├── .agents/               # Antigravity skills, hooks, and scripts (see above)
 ├── backend/
 │   ├── app/
 │   │   ├── agents/
