@@ -117,7 +117,18 @@ DEFAULT_PROFILE = {
     "dementia_type": "Alzheimer's (Moderate Stage)",
     "triggers": ["direct correction", "being rushed", "loud noises", "asking 'do you remember?'"],
     "preferences": ["listening to 1950s big band music", "drinking chamomile tea", "talking about her past work as a gardener"],
-    "background": "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the late afternoon (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her."
+    "background": "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the late afternoon (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her.",
+    "medications": [
+        {"name": "Donepezil (Aricept)", "purpose": "memory / cognition"},
+        {"name": "Metformin", "purpose": "Type 2 diabetes"},
+        {"name": "Quetiapine (low dose)", "purpose": "agitation / sleep"}
+    ],
+    "conditions": ["Type 2 Diabetes", "Hypertension", "Osteoporosis"],
+    "allergies": ["Penicillin"],
+    "fall_risk": "Medium",
+    "mobility_aids": ["walker"],
+    "diet_texture": "Soft",
+    "sensory_aids": ["glasses"]
 }
 
 ARTHUR_PROFILE = {
@@ -125,7 +136,18 @@ ARTHUR_PROFILE = {
     "dementia_type": "Lewy Body Dementia (Moderate Stage)",
     "triggers": ["hallucinations", "being corrected about visions", "sudden movements", "complex task demands"],
     "preferences": ["watching classic movies", "eating soft butterscotch candy", "holding a warm cup of coffee"],
-    "background": "Arthur is 82 years old. He has Lewy Body dementia and experiences vivid visual hallucinations (often seeing children or small animals in the room). He gets highly anxious when others tell him these are not real. He is prone to motor fluctuations and stiffness, especially during transitions."
+    "background": "Arthur is 82 years old. He has Lewy Body dementia and experiences vivid visual hallucinations (often seeing children or small animals in the room). He gets highly anxious when others tell him these are not real. He is prone to motor fluctuations and stiffness, especially during transitions.",
+    "medications": [
+        {"name": "Rivastigmine (Exelon)", "purpose": "memory / cognition"},
+        {"name": "Carbidopa-Levodopa", "purpose": "Parkinson's-like motor symptoms"},
+        {"name": "Melatonin", "purpose": "sleep regulation"}
+    ],
+    "conditions": ["Lewy Body Dementia", "Parkinsonism", "Atrial Fibrillation"],
+    "allergies": [],
+    "fall_risk": "High",
+    "mobility_aids": ["cane", "grab bars"],
+    "diet_texture": "Regular",
+    "sensory_aids": ["hearing aids", "glasses"]
 }
 
 def init_db():
@@ -136,9 +158,26 @@ def init_db():
             dementia_type TEXT,
             triggers TEXT,
             preferences TEXT,
-            background TEXT
+            background TEXT,
+            medications TEXT,
+            conditions TEXT,
+            allergies TEXT,
+            fall_risk TEXT,
+            mobility_aids TEXT,
+            diet_texture TEXT,
+            sensory_aids TEXT
         )
     """)
+    # Migrate existing tables that predate the new health columns
+    for col, default in [
+        ("medications", "[]"), ("conditions", "[]"), ("allergies", "[]"),
+        ("fall_risk", "Low"), ("mobility_aids", "[]"),
+        ("diet_texture", "Regular"), ("sensory_aids", "[]")
+    ]:
+        try:
+            db_client.execute(f"ALTER TABLE patients ADD COLUMN {col} TEXT DEFAULT '{default}'")
+        except Exception:
+            pass  # column already exists
     db_client.execute("""
         CREATE TABLE IF NOT EXISTS safety_escalations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -185,28 +224,40 @@ def init_db():
             except Exception:
                 pass
         db_client.execute("""
-            INSERT INTO patients (name, dementia_type, triggers, preferences, background)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO patients (name, dementia_type, triggers, preferences, background,
+                medications, conditions, allergies, fall_risk, mobility_aids, diet_texture, sensory_aids)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            maria_profile["name"],
-            maria_profile["dementia_type"],
-            json.dumps(maria_profile["triggers"]),
-            json.dumps(maria_profile["preferences"]),
-            maria_profile["background"]
+            maria_profile["name"], maria_profile["dementia_type"],
+            json.dumps(maria_profile["triggers"]), json.dumps(maria_profile["preferences"]),
+            maria_profile["background"],
+            json.dumps(maria_profile.get("medications", [])),
+            json.dumps(maria_profile.get("conditions", [])),
+            json.dumps(maria_profile.get("allergies", [])),
+            maria_profile.get("fall_risk", "Low"),
+            json.dumps(maria_profile.get("mobility_aids", [])),
+            maria_profile.get("diet_texture", "Regular"),
+            json.dumps(maria_profile.get("sensory_aids", []))
         ))
 
     # Seed Arthur
     row = db_client.fetchone("SELECT COUNT(*) FROM patients WHERE name = ?", ("Arthur",))
     if row and list(row.values())[0] == 0:
         db_client.execute("""
-            INSERT INTO patients (name, dementia_type, triggers, preferences, background)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO patients (name, dementia_type, triggers, preferences, background,
+                medications, conditions, allergies, fall_risk, mobility_aids, diet_texture, sensory_aids)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            ARTHUR_PROFILE["name"],
-            ARTHUR_PROFILE["dementia_type"],
-            json.dumps(ARTHUR_PROFILE["triggers"]),
-            json.dumps(ARTHUR_PROFILE["preferences"]),
-            ARTHUR_PROFILE["background"]
+            ARTHUR_PROFILE["name"], ARTHUR_PROFILE["dementia_type"],
+            json.dumps(ARTHUR_PROFILE["triggers"]), json.dumps(ARTHUR_PROFILE["preferences"]),
+            ARTHUR_PROFILE["background"],
+            json.dumps(ARTHUR_PROFILE.get("medications", [])),
+            json.dumps(ARTHUR_PROFILE.get("conditions", [])),
+            json.dumps(ARTHUR_PROFILE.get("allergies", [])),
+            ARTHUR_PROFILE.get("fall_risk", "Low"),
+            json.dumps(ARTHUR_PROFILE.get("mobility_aids", [])),
+            ARTHUR_PROFILE.get("diet_texture", "Regular"),
+            json.dumps(ARTHUR_PROFILE.get("sensory_aids", []))
         ))
 
 # Run database initialization
@@ -220,37 +271,38 @@ try:
 except Exception as e:
     print(f"Failed to run Gemini File API startup cleanup: {e}")
 
+def _row_to_profile(row: dict) -> dict:
+    return {
+        "name": row["name"],
+        "dementia_type": row["dementia_type"],
+        "triggers": json.loads(row["triggers"]) if row["triggers"] else [],
+        "preferences": json.loads(row["preferences"]) if row["preferences"] else [],
+        "background": row["background"],
+        "medications": json.loads(row["medications"]) if row.get("medications") else [],
+        "conditions": json.loads(row["conditions"]) if row.get("conditions") else [],
+        "allergies": json.loads(row["allergies"]) if row.get("allergies") else [],
+        "fall_risk": row.get("fall_risk") or "Low",
+        "mobility_aids": json.loads(row["mobility_aids"]) if row.get("mobility_aids") else [],
+        "diet_texture": row.get("diet_texture") or "Regular",
+        "sensory_aids": json.loads(row["sensory_aids"]) if row.get("sensory_aids") else [],
+    }
+
 def load_patient_profile(name: Optional[str] = None) -> dict:
     try:
         if name:
-            row = db_client.fetchone("SELECT name, dementia_type, triggers, preferences, background FROM patients WHERE name = ?", (name,))
+            row = db_client.fetchone("SELECT * FROM patients WHERE name = ?", (name,))
         else:
-            row = db_client.fetchone("SELECT name, dementia_type, triggers, preferences, background FROM patients ORDER BY id ASC LIMIT 1")
+            row = db_client.fetchone("SELECT * FROM patients ORDER BY id ASC LIMIT 1")
         if row:
-            return {
-                "name": row["name"],
-                "dementia_type": row["dementia_type"],
-                "triggers": json.loads(row["triggers"]) if row["triggers"] else [],
-                "preferences": json.loads(row["preferences"]) if row["preferences"] else [],
-                "background": row["background"]
-            }
+            return _row_to_profile(row)
     except Exception as e:
         print(f"Error loading patient profile: {e}")
     return DEFAULT_PROFILE
 
 def load_all_patients() -> list:
     try:
-        rows = db_client.fetchall("SELECT name, dementia_type, triggers, preferences, background FROM patients")
-        return [
-            {
-                "name": r["name"],
-                "dementia_type": r["dementia_type"],
-                "triggers": json.loads(r["triggers"]) if r["triggers"] else [],
-                "preferences": json.loads(r["preferences"]) if r["preferences"] else [],
-                "background": r["background"]
-            }
-            for r in rows
-        ]
+        rows = db_client.fetchall("SELECT * FROM patients")
+        return [_row_to_profile(r) for r in rows]
     except Exception as e:
         print(f"Error loading all patients: {e}")
     return [DEFAULT_PROFILE]
@@ -258,29 +310,33 @@ def load_all_patients() -> list:
 def save_patient_profile(profile: dict):
     try:
         row = db_client.fetchone("SELECT id FROM patients WHERE name = ?", (profile.get("name"),))
+        params = (
+            profile.get("dementia_type"),
+            json.dumps(profile.get("triggers", [])),
+            json.dumps(profile.get("preferences", [])),
+            profile.get("background"),
+            json.dumps(profile.get("medications", [])),
+            json.dumps(profile.get("conditions", [])),
+            json.dumps(profile.get("allergies", [])),
+            profile.get("fall_risk", "Low"),
+            json.dumps(profile.get("mobility_aids", [])),
+            profile.get("diet_texture", "Regular"),
+            json.dumps(profile.get("sensory_aids", [])),
+        )
         if row:
             db_client.execute("""
                 UPDATE patients
-                SET dementia_type = ?, triggers = ?, preferences = ?, background = ?
+                SET dementia_type = ?, triggers = ?, preferences = ?, background = ?,
+                    medications = ?, conditions = ?, allergies = ?, fall_risk = ?,
+                    mobility_aids = ?, diet_texture = ?, sensory_aids = ?
                 WHERE id = ?
-            """, (
-                profile.get("dementia_type"),
-                json.dumps(profile.get("triggers", [])),
-                json.dumps(profile.get("preferences", [])),
-                profile.get("background"),
-                list(row.values())[0]
-            ))
+            """, params + (list(row.values())[0],))
         else:
             db_client.execute("""
-                INSERT INTO patients (name, dementia_type, triggers, preferences, background)
-                VALUES (?, ?, ?, ?, ?)
-            """, (
-                profile.get("name"),
-                profile.get("dementia_type"),
-                json.dumps(profile.get("triggers", [])),
-                json.dumps(profile.get("preferences", [])),
-                profile.get("background")
-            ))
+                INSERT INTO patients (name, dementia_type, triggers, preferences, background,
+                    medications, conditions, allergies, fall_risk, mobility_aids, diet_texture, sensory_aids)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (profile.get("name"),) + params)
     except Exception as e:
         print(f"Error saving patient profile: {e}")
 

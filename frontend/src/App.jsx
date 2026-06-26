@@ -39,7 +39,18 @@ const MOCK_PATIENT = {
   dementia_type: "Alzheimer's (Moderate Stage)",
   triggers: ["direct correction", "being rushed", "loud noises", "asking 'do you remember?'"],
   preferences: ["listening to 1950s big band music", "drinking chamomile tea", "talking about her past work as a gardener"],
-  background: "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the late afternoon (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her."
+  background: "Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the late afternoon (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her.",
+  medications: [
+    { name: "Donepezil (Aricept)", purpose: "memory / cognition" },
+    { name: "Metformin", purpose: "Type 2 diabetes" },
+    { name: "Quetiapine (low dose)", purpose: "agitation / sleep" }
+  ],
+  conditions: ["Type 2 Diabetes", "Hypertension", "Osteoporosis"],
+  allergies: ["Penicillin"],
+  fall_risk: "Medium",
+  mobility_aids: ["walker"],
+  diet_texture: "Soft",
+  sensory_aids: ["glasses"]
 };
 
 const MOCK_ARTHUR = {
@@ -47,7 +58,18 @@ const MOCK_ARTHUR = {
   dementia_type: "Lewy Body Dementia (Moderate Stage)",
   triggers: ["hallucinations", "being corrected about visions", "sudden movements", "complex task demands"],
   preferences: ["watching classic movies", "eating soft butterscotch candy", "holding a warm cup of coffee"],
-  background: "Arthur is 82 years old. He has Lewy Body dementia and experiences vivid visual hallucinations (often seeing children or small animals in the room). He gets highly anxious when others tell him these are not real. He is prone to motor fluctuations and stiffness, especially during transitions."
+  background: "Arthur is 82 years old. He has Lewy Body dementia and experiences vivid visual hallucinations (often seeing children or small animals in the room). He gets highly anxious when others tell him these are not real. He is prone to motor fluctuations and stiffness, especially during transitions.",
+  medications: [
+    { name: "Rivastigmine (Exelon)", purpose: "memory / cognition" },
+    { name: "Carbidopa-Levodopa", purpose: "Parkinson's-like motor symptoms" },
+    { name: "Melatonin", purpose: "sleep regulation" }
+  ],
+  conditions: ["Lewy Body Dementia", "Parkinsonism", "Atrial Fibrillation"],
+  allergies: [],
+  fall_risk: "High",
+  mobility_aids: ["cane", "grab bars"],
+  diet_texture: "Regular",
+  sensory_aids: ["hearing aids", "glasses"]
 };
 
 const MOCK_ANALYSIS_MED_REFUSAL = {
@@ -226,6 +248,12 @@ function App() {
   const [patientsList, setPatientsList] = useState([MOCK_PATIENT, MOCK_ARTHUR]);
   const [newTrigger, setNewTrigger] = useState('');
   const [newPreference, setNewPreference] = useState('');
+  const [newCondition, setNewCondition] = useState('');
+  const [newAllergy, setNewAllergy] = useState('');
+  const [newMobilityAid, setNewMobilityAid] = useState('');
+  const [newSensoryAid, setNewSensoryAid] = useState('');
+  const [newMedName, setNewMedName] = useState('');
+  const [newMedPurpose, setNewMedPurpose] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [suggestedUpdates, setSuggestedUpdates] = useState(null); // { triggers: [], preferences: [] }
   const [interactionLogs, setInteractionLogs] = useState([]);
@@ -1356,9 +1384,22 @@ function App() {
         <button
           className={`tab-button ${activeTab === 'profile' ? 'active' : ''}`}
           onClick={() => setActiveTab('profile')}
+          style={{ position: 'relative' }}
         >
           <User size={18} />
           <span>Patient Profile</span>
+          {suggestedUpdates && (suggestedUpdates.triggers?.length > 0 || suggestedUpdates.preferences?.length > 0) && (
+            <span style={{
+              position: 'absolute', top: '6px', right: '6px',
+              background: 'var(--color-warning)', color: '#fff',
+              borderRadius: '999px', fontSize: '0.65rem', fontWeight: 700,
+              minWidth: '16px', height: '16px', padding: '0 4px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              lineHeight: 1
+            }}>
+              {(suggestedUpdates.triggers?.length || 0) + (suggestedUpdates.preferences?.length || 0)}
+            </span>
+          )}
         </button>
         <button
           className={`tab-button ${activeTab === 'simulator' ? 'active' : ''}`}
@@ -2106,6 +2147,173 @@ function App() {
                       </button>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* ── Health Information ── */}
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Health Information</p>
+
+                {/* Medications */}
+                <div className="form-group">
+                  <label className="form-label">Current Medications</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      style={{ flex: 2 }}
+                      placeholder="Medication name (e.g. Donepezil)"
+                      value={newMedName}
+                      onChange={(e) => setNewMedName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (newMedName.trim()) {
+                            setPatient({ ...patient, medications: [...(patient.medications || []), { name: newMedName.trim(), purpose: newMedPurpose.trim() }] });
+                            setNewMedName(''); setNewMedPurpose('');
+                          }
+                        }
+                      }}
+                    />
+                    <input
+                      type="text"
+                      className="form-input"
+                      style={{ flex: 2 }}
+                      placeholder="Purpose (e.g. memory / cognition)"
+                      value={newMedPurpose}
+                      onChange={(e) => setNewMedPurpose(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (newMedName.trim()) {
+                            setPatient({ ...patient, medications: [...(patient.medications || []), { name: newMedName.trim(), purpose: newMedPurpose.trim() }] });
+                            setNewMedName(''); setNewMedPurpose('');
+                          }
+                        }
+                      }}
+                    />
+                    <button type="button" className="btn btn-secondary" onClick={() => {
+                      if (newMedName.trim()) {
+                        setPatient({ ...patient, medications: [...(patient.medications || []), { name: newMedName.trim(), purpose: newMedPurpose.trim() }] });
+                        setNewMedName(''); setNewMedPurpose('');
+                      }
+                    }}><Plus size={18} /></button>
+                  </div>
+                  <div className="tag-container" style={{ marginTop: '0.5rem' }}>
+                    {(patient.medications || []).map((med, idx) => (
+                      <div key={idx} className="tag-pill" style={{ borderColor: 'rgba(99,102,241,0.4)', color: 'rgb(99,102,241)' }}>
+                        <span><strong>{med.name}</strong>{med.purpose ? ` — ${med.purpose}` : ''}</span>
+                        <button type="button" className="tag-delete-btn" onClick={() => setPatient({ ...patient, medications: patient.medications.filter((_, i) => i !== idx) })}>
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Medical Conditions + Allergies side by side */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Medical Conditions</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input type="text" className="form-input" style={{ flex: 1 }} placeholder="e.g. Type 2 Diabetes"
+                        value={newCondition} onChange={(e) => setNewCondition(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (newCondition.trim() && !(patient.conditions||[]).includes(newCondition.trim())) { setPatient({ ...patient, conditions: [...(patient.conditions||[]), newCondition.trim()] }); setNewCondition(''); } } }}
+                      />
+                      <button type="button" className="btn btn-secondary" onClick={() => { if (newCondition.trim() && !(patient.conditions||[]).includes(newCondition.trim())) { setPatient({ ...patient, conditions: [...(patient.conditions||[]), newCondition.trim()] }); setNewCondition(''); } }}><Plus size={18} /></button>
+                    </div>
+                    <div className="tag-container">
+                      {(patient.conditions || []).map((c, idx) => (
+                        <div key={idx} className="tag-pill" style={{ borderColor: 'rgba(239,68,68,0.35)', color: 'rgb(239,68,68)' }}>
+                          <span>{c}</span>
+                          <button type="button" className="tag-delete-btn" onClick={() => setPatient({ ...patient, conditions: patient.conditions.filter((_, i) => i !== idx) })}><Trash2 size={12} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Allergies</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input type="text" className="form-input" style={{ flex: 1 }} placeholder="e.g. Penicillin"
+                        value={newAllergy} onChange={(e) => setNewAllergy(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (newAllergy.trim() && !(patient.allergies||[]).includes(newAllergy.trim())) { setPatient({ ...patient, allergies: [...(patient.allergies||[]), newAllergy.trim()] }); setNewAllergy(''); } } }}
+                      />
+                      <button type="button" className="btn btn-secondary" onClick={() => { if (newAllergy.trim() && !(patient.allergies||[]).includes(newAllergy.trim())) { setPatient({ ...patient, allergies: [...(patient.allergies||[]), newAllergy.trim()] }); setNewAllergy(''); } }}><Plus size={18} /></button>
+                    </div>
+                    <div className="tag-container">
+                      {(patient.allergies || []).map((a, idx) => (
+                        <div key={idx} className="tag-pill" style={{ borderColor: 'rgba(245,158,11,0.4)', color: 'rgb(245,158,11)' }}>
+                          <span>{a}</span>
+                          <button type="button" className="tag-delete-btn" onClick={() => setPatient({ ...patient, allergies: patient.allergies.filter((_, i) => i !== idx) })}><Trash2 size={12} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fall Risk + Diet Texture */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Fall Risk</label>
+                    <select className="form-input" value={patient.fall_risk || 'Low'} onChange={(e) => setPatient({ ...patient, fall_risk: e.target.value })}
+                      style={{ cursor: 'pointer' }}>
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Diet / Food Texture</label>
+                    <select className="form-input" value={patient.diet_texture || 'Regular'} onChange={(e) => setPatient({ ...patient, diet_texture: e.target.value })}
+                      style={{ cursor: 'pointer' }}>
+                      <option value="Regular">Regular</option>
+                      <option value="Soft">Soft</option>
+                      <option value="Pureed">Pureed</option>
+                      <option value="Thickened Liquids">Thickened Liquids</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Mobility Aids + Sensory Aids */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Mobility Aids</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input type="text" className="form-input" style={{ flex: 1 }} placeholder="e.g. walker, cane"
+                        value={newMobilityAid} onChange={(e) => setNewMobilityAid(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (newMobilityAid.trim() && !(patient.mobility_aids||[]).includes(newMobilityAid.trim())) { setPatient({ ...patient, mobility_aids: [...(patient.mobility_aids||[]), newMobilityAid.trim()] }); setNewMobilityAid(''); } } }}
+                      />
+                      <button type="button" className="btn btn-secondary" onClick={() => { if (newMobilityAid.trim() && !(patient.mobility_aids||[]).includes(newMobilityAid.trim())) { setPatient({ ...patient, mobility_aids: [...(patient.mobility_aids||[]), newMobilityAid.trim()] }); setNewMobilityAid(''); } }}><Plus size={18} /></button>
+                    </div>
+                    <div className="tag-container">
+                      {(patient.mobility_aids || []).map((m, idx) => (
+                        <div key={idx} className="tag-pill">
+                          <span>{m}</span>
+                          <button type="button" className="tag-delete-btn" onClick={() => setPatient({ ...patient, mobility_aids: patient.mobility_aids.filter((_, i) => i !== idx) })}><Trash2 size={12} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Sensory Aids</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input type="text" className="form-input" style={{ flex: 1 }} placeholder="e.g. hearing aids, glasses"
+                        value={newSensoryAid} onChange={(e) => setNewSensoryAid(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (newSensoryAid.trim() && !(patient.sensory_aids||[]).includes(newSensoryAid.trim())) { setPatient({ ...patient, sensory_aids: [...(patient.sensory_aids||[]), newSensoryAid.trim()] }); setNewSensoryAid(''); } } }}
+                      />
+                      <button type="button" className="btn btn-secondary" onClick={() => { if (newSensoryAid.trim() && !(patient.sensory_aids||[]).includes(newSensoryAid.trim())) { setPatient({ ...patient, sensory_aids: [...(patient.sensory_aids||[]), newSensoryAid.trim()] }); setNewSensoryAid(''); } }}><Plus size={18} /></button>
+                    </div>
+                    <div className="tag-container">
+                      {(patient.sensory_aids || []).map((s, idx) => (
+                        <div key={idx} className="tag-pill">
+                          <span>{s}</span>
+                          <button type="button" className="tag-delete-btn" onClick={() => setPatient({ ...patient, sensory_aids: patient.sensory_aids.filter((_, i) => i !== idx) })}><Trash2 size={12} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
