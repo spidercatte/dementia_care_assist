@@ -7,7 +7,7 @@ from unittest import mock
 from google import genai
 from app.config import settings
 from app.schemas import CareGuidanceResponse
-from app.agents.care_guidance import CareGuidanceAgent
+from app.agents.care_guidance import CareGuidanceService
 
 # Load eval cases from dataset
 EVAL_DATASET_PATH = os.path.join(os.path.dirname(__file__), "eval_dataset.json")
@@ -76,19 +76,19 @@ def gemini_client():
 
 
 @pytest.mark.parametrize("case", eval_cases)
-def test_care_guidance_agent(gemini_client, case):
+def test_care_guidance_service(gemini_client, case):
     """
-    Evaluates the Care Guidance Agent (Agent 3) on interaction summaries.
+    Evaluates the Care Guidance Service (Step 3) on interaction summaries.
     """
-    agent = CareGuidanceAgent(gemini_client)
+    service = CareGuidanceService(gemini_client)
 
     # Mock inputs matching schema output formats
     interaction_summary = f"Patient is exhibiting: {case['description']}"
     patient_context = "Patient: Maria, Stage: Moderate Alzheimer's. Triggers: direct correction."
     guidelines_text = "Guideline: Validation Therapy\nAlways validate the patient's emotion. Do not force them."
 
-    # Run the agent
-    response = agent.run(
+    # Run the service
+    response = service.run(
         interaction_summary=interaction_summary,
         patient_context=patient_context,
         guidelines_text=guidelines_text

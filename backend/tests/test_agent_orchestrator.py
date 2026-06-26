@@ -11,7 +11,8 @@ from app.schemas import (
     InteractionAnalysisResponse,
     PatientContextResponse,
     CareGuidanceResponse,
-    SafetyEscalationResponse
+    SafetyEscalationResponse,
+    ValidationResponse
 )
 from app.agents.orchestrator import OrchestratorAgent
 
@@ -55,8 +56,17 @@ def get_mock_llm_response(*args, **kwargs):
     def has_any(words):
         return has_any_word(words, text_content_lower)
 
-    # 1. Interaction Analysis Agent Response
-    if "interaction analysis agent" in text_content_lower:
+    # 0. Intake Validation Service Response
+    if "intake validation service" in text_content_lower:
+        resp = ValidationResponse(
+            is_valid=True,
+            summary="Patient refuses instruction/care.",
+            reason=None
+        )
+        return MockGenerateContentResponse(resp.model_dump_json())
+
+    # 1. Interaction Analyzer Response
+    if "interaction analyzer" in text_content_lower:
         detected_language = "Spanish" if has_any(["gritting", "pastillas", "mariano", "veneno", "gritando"]) else "English"
 
         # Agitation/confusion defaults
@@ -118,8 +128,8 @@ def get_mock_llm_response(*args, **kwargs):
         )
         return MockGenerateContentResponse(resp.model_dump_json())
 
-    # 2. Patient Context Agent Response
-    elif "clinical records agent" in text_content_lower:
+    # 2. Patient Context Processor Response
+    elif "clinical records processor" in text_content_lower:
         resp = PatientContextResponse(
             clinical_stage="Alzheimer's (Moderate)",
             active_triggers=["direct correction", "asking do you remember"],
@@ -129,8 +139,8 @@ def get_mock_llm_response(*args, **kwargs):
         )
         return MockGenerateContentResponse(resp.model_dump_json())
 
-    # 3. Care Guidance Agent Response
-    elif "clinical care guidance agent" in text_content_lower:
+    # 3. Care Guidance Service Response
+    elif "clinical care guidance service" in text_content_lower:
         if has_any(["pastillas", "veneno", "gritando", "rechazo", "tomar"]):
             do_nots = ["discutir", "obligar", "forzar"]
         elif has_any(["teaching", "door", "wandering"]):
@@ -149,8 +159,8 @@ def get_mock_llm_response(*args, **kwargs):
         )
         return MockGenerateContentResponse(resp.model_dump_json())
 
-    # 4. Safety & Escalation Agent Response
-    elif "clinical safety and risk escalation agent" in text_content_lower:
+    # 4. Safety & Escalation Evaluator Response
+    elif "clinical safety and risk evaluator" in text_content_lower:
         risk = "MEDIUM"
         escalate = False
         if has_any(["slipped", "tile", "hip", "fall", "injury"]):
@@ -244,6 +254,7 @@ def test_orchestrator_pipeline_e2e(gemini_client, case):
     if hasattr(gemini_client, "models"):
         orchestrator.client = gemini_client
         orchestrator.use_mock = False
+        orchestrator.validator.client = gemini_client
         orchestrator.analyzer.client = gemini_client
         orchestrator.context_expert.client = gemini_client
         orchestrator.guidance_expert.client = gemini_client
@@ -262,3 +273,31 @@ def test_orchestrator_pipeline_e2e(gemini_client, case):
     assert final_output.try_saying
     assert final_output.avoid_saying
     assert final_output.detected_language == case["expected"]["detected_language"]
+
+
+def test_orchestrator_pipeline_invalid_input(gemini_client):
+    """
+    Verifies that invalid/nonsensical input is rejected by the validation gate.
+    """
+    orchestrator = OrchestratorAgent()
+
+    # Override gemini client with mock client
+    if hasattr(gemini_client, "models"):
+        orchestrator.client = gemini_client
+        orchestrator.use_mock = False
+        orchestrator.validator.client = gemini_client
+
+    patient_profile = {
+        "name": "Maria",
+        "dementia_type": "Alzheimer's (Moderate Stage)",
+        "triggers": [],
+        "preferences": [],
+        "background": ""
+    }
+
+    with mock.patch.object(orchestrator.validator, 'run', return_value=ValidationResponse(is_valid=False, summary=None, reason="The audio file contains only silence/noise.")):
+        invalid_output = orchestrator.run_pipeline(["some-silent-audio"], patient_profile)
+
+    assert isinstance(invalid_output, FinalCoachingResponse)
+    assert invalid_output.observed_behavior == "Input Insufficient / Invalid"
+    assert "The audio file contains only silence/noise." in invalid_output.recommended_response

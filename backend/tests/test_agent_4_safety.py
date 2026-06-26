@@ -7,7 +7,7 @@ from unittest import mock
 from google import genai
 from app.config import settings
 from app.schemas import SafetyEscalationResponse
-from app.agents.safety_escalation import SafetyEscalationAgent
+from app.agents.safety_escalation import SafetyEvaluator
 
 # Load eval cases from dataset
 EVAL_DATASET_PATH = os.path.join(os.path.dirname(__file__), "eval_dataset.json")
@@ -77,14 +77,14 @@ def gemini_client():
 
 
 @pytest.mark.parametrize("case", eval_cases)
-def test_safety_escalation_agent(gemini_client, case):
+def test_safety_evaluator(gemini_client, case):
     """
-    Evaluates the Safety & Escalation Agent (Agent 4) on risk classification.
+    Evaluates the Safety & Escalation Evaluator (Step 4) on risk classification.
     """
-    agent = SafetyEscalationAgent(gemini_client)
+    evaluator = SafetyEvaluator(gemini_client)
 
-    # Run the agent
-    response = agent.run(
+    # Run the evaluator
+    response = evaluator.run(
         interaction_summary=case["description"],
         health_risk_factors=case["patient_profile"]["background"].split("."),
         clinical_advice="Ensure patient is safe. Do not force or lock door."

@@ -189,10 +189,16 @@ def test_api_translate_feedback():
         "target_language": "Spanish"
     }
 
-    response = client.post("/translate", json=payload)
-    assert response.status_code == 200
-    data = response.json()
-    assert data["observed_behavior"] == "Rechazo de medicamentos y paranoia de robo"
+    from app.main import orchestrator
+    old_use_mock = orchestrator.use_mock
+    orchestrator.use_mock = True
+    try:
+        response = client.post("/translate", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["observed_behavior"] == "Rechazo de medicamentos y paranoia de robo"
+    finally:
+        orchestrator.use_mock = old_use_mock
 
 
 @mock.patch("app.main.simulator.run")

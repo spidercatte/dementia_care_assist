@@ -1,11 +1,12 @@
 import logging
 from typing import List
 from google.genai import types
+from app.agents.utils import clean_json_text
 from app.schemas import SafetyEscalationResponse
 
-logger = logging.getLogger("dementiacare-safety-agent")
+logger = logging.getLogger("dementiacare-safety-evaluator")
 
-class SafetyEscalationAgent:
+class SafetyEvaluator:
     def __init__(self, client):
         self.client = client
 
@@ -15,9 +16,9 @@ class SafetyEscalationAgent:
         health_risk_factors: List[str],
         clinical_advice: str
     ) -> SafetyEscalationResponse:
-        logger.info("Agent 4 running: Safety & Escalation...")
+        logger.info("Step 4 running: Safety & Escalation...")
         prompt = (
-            f"You are a Clinical Safety and Risk Escalation Agent.\n"
+            f"You are a Clinical Safety and Risk Evaluator.\n"
             f"Examine the interaction details, patient context, and clinical advice to identify safety hazards:\n\n"
             f"--- INTERACTION ANALYSIS ---\n"
             f"Summary: {interaction_summary}\n\n"
@@ -42,4 +43,4 @@ class SafetyEscalationAgent:
                 response_schema=SafetyEscalationResponse
             )
         )
-        return SafetyEscalationResponse.model_validate_json(response.text)
+        return SafetyEscalationResponse.model_validate_json(clean_json_text(response.text))

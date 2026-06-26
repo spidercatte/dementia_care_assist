@@ -1,5 +1,6 @@
 import logging
 from google.genai import types
+from app.agents.utils import clean_json_text
 from app.schemas import (
     FinalCoachingResponse,
     InteractionAnalysisResponse,
@@ -10,9 +11,9 @@ from app.schemas import (
     Recommendation
 )
 
-logger = logging.getLogger("dementiacare-coaching-agent")
+logger = logging.getLogger("dementiacare-coaching-synthesizer")
 
-class CaregiverCoachingAgent:
+class CoachingSynthesizer:
     def __init__(self, client):
         self.client = client
 
@@ -23,7 +24,7 @@ class CaregiverCoachingAgent:
         guidance: CareGuidanceResponse,
         safety: SafetyEscalationResponse
     ) -> FinalCoachingResponse:
-        logger.info("Agent 5 running: Caregiver Coaching Synthesis...")
+        logger.info("Step 5 running: Caregiver Coaching Synthesis...")
         timeline_text = "\n".join([
             f"- {obs.timeframe} | Behavior: {obs.observable_behavior} | Symptom: {obs.clinical_symptom} | State: {obs.cognitive_state}"
             for obs in analysis.behavioral_timeline
@@ -67,4 +68,4 @@ class CaregiverCoachingAgent:
                 response_schema=FinalCoachingResponse
             )
         )
-        return FinalCoachingResponse.model_validate_json(response.text)
+        return FinalCoachingResponse.model_validate_json(clean_json_text(response.text))

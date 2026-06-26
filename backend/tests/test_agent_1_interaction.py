@@ -7,7 +7,7 @@ from unittest import mock
 from google import genai
 from app.config import settings
 from app.schemas import InteractionAnalysisResponse
-from app.agents.interaction_analysis import InteractionAnalysisAgent
+from app.agents.interaction_analysis import InteractionAnalyzer
 
 # Load eval cases from dataset
 EVAL_DATASET_PATH = os.path.join(os.path.dirname(__file__), "eval_dataset.json")
@@ -92,14 +92,14 @@ def gemini_client():
 
 
 @pytest.mark.parametrize("case", eval_cases)
-def test_interaction_analysis_agent(gemini_client, case):
+def test_interaction_analyzer(gemini_client, case):
     """
-    Evaluates the Interaction Analysis Agent (Agent 1) on the test cases.
+    Evaluates the Interaction Analyzer (Step 1) on the test cases.
     """
-    agent = InteractionAnalysisAgent(gemini_client)
+    analyzer = InteractionAnalyzer(gemini_client)
 
-    # Run the agent
-    response = agent.run([case["description"]])
+    # Run the analyzer
+    response = analyzer.run([case["description"]])
 
     # Assertions on response schema validation
     assert isinstance(response, InteractionAnalysisResponse)

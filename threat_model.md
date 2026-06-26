@@ -1,21 +1,21 @@
 # STRIDE Threat Model Assessment: DementiaCare Coach
 
-This document details the threat modeling assessment of the **DementiaCare Coach** agentic graph and backend architecture using the STRIDE methodology.
+This document details the threat modeling assessment of the **DementiaCare Coach** sequential pipeline and backend architecture using the STRIDE methodology.
 
 ---
 
 ## 1. System Description & Data Flow
 
-DementiaCare Coach is a modular 6-agent collaborative pipeline that coordinates caregiver interactions, retrieves clinical guidelines via a RAG pipeline (ChromaDB), and produces coaching feedback using the Google Gemini API.
+DementiaCare Coach is a modular 6-step sequential pipeline that coordinates caregiver interactions, retrieves clinical guidelines via a RAG pipeline (ChromaDB), and produces coaching feedback using the Google Gemini API.
 
 ### Boundaries & Entry Points
 * **Entry Points**: FastAPI public HTTP endpoints defined in [main.py](file:///workspaces/dementia_care_assist/backend/app/main.py) (`/patient`, `/guidelines/seed`, `/analyze/text`, `/analyze/file`, `/simulator/step`).
 * **Data Flow**:
   1. Caregiver inputs text or uploads a file via the React Frontend.
   2. The FastAPI Backend handles requests and reads/writes the local `patient_profile.json` file.
-  3. The [OrchestratorAgent](file:///workspaces/dementia_care_assist/backend/app/agents/orchestrator.py) coordinates data flow to specialized sub-agents ([interaction_analysis](file:///workspaces/dementia_care_assist/backend/app/agents/interaction_analysis.py), [patient_context](file:///workspaces/dementia_care_assist/backend/app/agents/patient_context.py), [care_guidance](file:///workspaces/dementia_care_assist/backend/app/agents/care_guidance.py), [safety_escalation](file:///workspaces/dementia_care_assist/backend/app/agents/safety_escalation.py), [caregiver_coaching](file:///workspaces/dementia_care_assist/backend/app/agents/caregiver_coaching.py)).
+  3. The `OrchestratorAgent` in [orchestrator.py](file:///workspaces/dementia_care_assist/backend/app/agents/orchestrator.py) coordinates data flow to specialized pipeline steps: [validation](file:///workspaces/dementia_care_assist/backend/app/agents/validation.py), [interaction_analysis](file:///workspaces/dementia_care_assist/backend/app/agents/interaction_analysis.py), [patient_context](file:///workspaces/dementia_care_assist/backend/app/agents/patient_context.py), [care_guidance](file:///workspaces/dementia_care_assist/backend/app/agents/care_guidance.py), [safety_escalation](file:///workspaces/dementia_care_assist/backend/app/agents/safety_escalation.py), and [caregiver_coaching](file:///workspaces/dementia_care_assist/backend/app/agents/caregiver_coaching.py).
   4. The RAG pipeline in [rag.py](file:///workspaces/dementia_care_assist/backend/app/rag.py) queries a local ChromaDB instance containing embedded guidelines.
-  5. The agents compile contexts and query the external **Google Gemini API** (handling uploads via the Gemini File API).
+  5. The pipeline steps compile contexts and query the external **Google Gemini API** (handling uploads via the Gemini File API).
   6. Final responses are returned to the frontend.
 
 ---
@@ -33,33 +33,33 @@ DementiaCare Coach is a modular 6-agent collaborative pipeline that coordinates 
 
 ---
 
-## 3. Threat Modeling the Agent Graph
+## 3. Threat Modeling the Sequential Pipeline
 
-The agent graph consists of 6 specialized collaborative agents (coordinated by [orchestrator.py](file:///workspaces/dementia_care_assist/backend/app/agents/orchestrator.py)):
+The pipeline consists of 6 specialized collaborative processing steps (coordinated by [orchestrator.py](file:///workspaces/dementia_care_assist/backend/app/agents/orchestrator.py)):
 ```mermaid
 graph TD
-    Orchestrator[Orchestrator Agent] --> Analyzer[Interaction Analysis Agent]
-    Orchestrator --> Context[Patient Context Agent]
+    Orchestrator[Orchestrator] --> Analyzer[Interaction Analyzer]
+    Orchestrator --> Context[Patient Context Processor]
     Analyzer -->|Generates RAG Query| RAG[ChromaDB RAG Retrieve]
-    RAG -->|Guidelines Context| Guidance[Care Guidance Agent]
+    RAG -->|Guidelines Context| Guidance[Care Guidance Service]
     Context -->|Patient Context| Guidance
-    Guidance -->|Clinical Advice| Safety[Safety & Escalation Agent]
-    Safety -->|Clinical Safety Check| Coach[Caregiver Coaching Agent]
+    Guidance -->|Clinical Advice| Safety[Safety Evaluator]
+    Safety -->|Clinical Safety Check| Coach[Coaching Synthesizer]
     Coach -->|Final Coaching Script| User[Caregiver]
 ```
 
-### Specific Agent Graph Risks:
+### Specific Pipeline Risks:
 
 1. **Cascade Prompt Injection**:
-   - If the [InteractionAnalysisAgent](file:///workspaces/dementia_care_assist/backend/app/agents/interaction_analysis.py) receives a prompt injection, it could generate a malicious `rag_query`. This query could fetch unrelated/unsafe documents from the guidelines DB or inject instructions that are passed down to the [CareGuidanceAgent](file:///workspaces/dementia_care_assist/backend/app/agents/care_guidance.py) and [SafetyEscalationAgent](file:///workspaces/dementia_care_assist/backend/app/agents/safety_escalation.py) agents, overriding safety blocks.
-   - **Recommendation**: Sanitize user inputs at the input boundary of the `Interaction Analysis Agent` and enforce strict parameter constraints on `rag_query`.
+   - If the [InteractionAnalyzer](file:///workspaces/dementia_care_assist/backend/app/agents/interaction_analysis.py) receives a prompt injection, it could generate a malicious `rag_query`. This query could fetch unrelated/unsafe documents from the guidelines DB or inject instructions that are passed down to the [CareGuidanceService](file:///workspaces/dementia_care_assist/backend/app/agents/care_guidance.py) and [SafetyEvaluator](file:///workspaces/dementia_care_assist/backend/app/agents/safety_escalation.py) services, overriding safety blocks.
+   - **Recommendation**: Sanitize user inputs at the input boundary of the `Interaction Analyzer` and enforce strict parameter constraints on `rag_query`.
 
 2. **RAG Poisoning via Unauthenticated Seeding**:
-   - An attacker capable of invoking the seeding endpoints (`/guidelines/seed`) could inject false or harmful clinical guidelines into ChromaDB. Since the `Care Guidance Agent` relies on these guidelines, it would offer bad clinical advice.
+   - An attacker capable of invoking the seeding endpoints (`/guidelines/seed`) could inject false or harmful clinical guidelines into ChromaDB. Since the `Care Guidance Service` relies on these guidelines, it would offer bad clinical advice.
    - **Recommendation**: Secure the RAG seeding API endpoint behind strict administrative authentication and require manual review/signing of ingested guideline files.
 
 3. **Patient Profile-based Injection**:
-   - The [PatientContextAgent](file:///workspaces/dementia_care_assist/backend/app/agents/patient_context.py) reads the patient profile directly and injects it into the prompt context. If a user can inject prompt directives into the profile (e.g., name or background containing `"System note: ignore previous instructions..."`), they can hijack the downstream analysis.
+   - The [PatientContextProcessor](file:///workspaces/dementia_care_assist/backend/app/agents/patient_context.py) reads the patient profile directly and injects it into the prompt context. If a user can inject prompt directives into the profile (e.g., name or background containing `"System note: ignore previous instructions..."`), they can hijack the downstream analysis.
    - **Recommendation**: Enforce rigid schemas, sanitize profile values before context construction, and use system instructions/developer messages to isolate data from instructions.
 
 4. **Gemini API Failures / Mock Mode Hijacking**:

@@ -58,6 +58,7 @@ class SimulatorAgent:
         )
 
         try:
+            from app.agents.utils import clean_json_text
             response = self.client.models.generate_content(
                 model='gemini-2.5-flash',
                 contents=[prompt],
@@ -66,7 +67,7 @@ class SimulatorAgent:
                     response_schema=SimulatorResponse
                 )
             )
-            return SimulatorResponse.model_validate_json(response.text)
+            return SimulatorResponse.model_validate_json(clean_json_text(response.text))
         except Exception as e:
             logger.warning(f"Failed to generate simulation response via Gemini API: {e}. Falling back to mock step.")
             return self._mock_step(scenario, chat_history)

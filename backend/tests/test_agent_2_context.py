@@ -7,7 +7,7 @@ from unittest import mock
 from google import genai
 from app.config import settings
 from app.schemas import PatientContextResponse
-from app.agents.patient_context import PatientContextAgent
+from app.agents.patient_context import PatientContextProcessor
 
 # Load eval cases from dataset
 EVAL_DATASET_PATH = os.path.join(os.path.dirname(__file__), "eval_dataset.json")
@@ -67,14 +67,14 @@ def gemini_client():
 
 
 @pytest.mark.parametrize("case", eval_cases)
-def test_patient_context_agent(gemini_client, case):
+def test_patient_context_processor(gemini_client, case):
     """
-    Evaluates the Patient Context Agent (Agent 2) on structured profiles.
+    Evaluates the Patient Context Processor (Step 2) on structured profiles.
     """
-    agent = PatientContextAgent(gemini_client)
+    processor = PatientContextProcessor(gemini_client)
 
-    # Run the agent
-    response = agent.run(case["patient_profile"])
+    # Run the processor
+    response = processor.run(case["patient_profile"])
 
     # Assertions on response schema validation
     assert isinstance(response, PatientContextResponse)

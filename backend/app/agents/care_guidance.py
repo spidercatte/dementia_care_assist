@@ -1,10 +1,11 @@
 import logging
 from google.genai import types
+from app.agents.utils import clean_json_text
 from app.schemas import CareGuidanceResponse
 
-logger = logging.getLogger("dementiacare-guidance-agent")
+logger = logging.getLogger("dementiacare-guidance-service")
 
-class CareGuidanceAgent:
+class CareGuidanceService:
     def __init__(self, client):
         self.client = client
 
@@ -14,9 +15,9 @@ class CareGuidanceAgent:
         patient_context: str,
         guidelines_text: str
     ) -> CareGuidanceResponse:
-        logger.info("Agent 3 running: Care Guidance (RAG)...")
+        logger.info("Step 3 running: Care Guidance (RAG)...")
         prompt = (
-            f"You are a Clinical Care Guidance Agent, expert in occupational therapy, nursing protocols, and dementia care practices.\n"
+            f"You are a Clinical Care Guidance Service, expert in occupational therapy, nursing protocols, and dementia care practices.\n"
             f"Based on the following inputs, generate evidence-based care advice:\n\n"
             f"--- INTERACTION SUMMARY ---\n"
             f"Summary: {interaction_summary}\n\n"
@@ -39,4 +40,4 @@ class CareGuidanceAgent:
                 response_schema=CareGuidanceResponse
             )
         )
-        return CareGuidanceResponse.model_validate_json(response.text)
+        return CareGuidanceResponse.model_validate_json(clean_json_text(response.text))

@@ -17,6 +17,7 @@ from app.database import db_client
 from app.schemas import FinalCoachingResponse, TranslationRequest
 from app.agents.orchestrator import OrchestratorAgent
 from app.agents.simulator import SimulatorAgent, SimulatorResponse
+from app.agents.conversational_coach import ConversationalCoachAgent
 from app.rag import seed_default_guidelines
 from app.mock_responses import get_mock_translation
 
@@ -266,6 +267,11 @@ class SimulatorRequest(BaseModel):
     chat_history: List[Dict[str, str]]
     patient_name: Optional[str] = None
 
+class CoachChatRequest(BaseModel):
+    chat_history: List[Dict[str, Any]]
+    feedback_context: Dict[str, Any]
+    patient_name: Optional[str] = None
+
 
 @app.get("/health")
 def health_check():
@@ -388,4 +394,30 @@ def simulator_step(request: SimulatorRequest, api_key: Optional[str] = Depends(v
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Simulation step failed. Please check backend logs."
+        )
+
+@app.post("/coach/chat")
+def coach_chat(request: CoachChatRequest, api_key: Optional[str] = Depends(verify_user_key)):
+    patient_profile = load_patient_profile(request.patient_name)
+
+    client = orchestrator.client
+    if orchestrator.use_mock or not client:
+        last_message = request.chat_history[-1]["content"] if request.chat_history else ""
+        return {
+            "response": f"[MOCK COACH] I hear your concern about Maria regarding '{last_message}'. Remember to use validation therapy: connect before correcting."
+        }
+
+    try:
+        agent = ConversationalCoachAgent(client)
+        response_text = agent.run(
+            chat_history=request.chat_history,
+            patient_profile=patient_profile,
+            feedback_context=request.feedback_context
+        )
+        return {"response": response_text}
+    except Exception as e:
+        print(f"[Error] Coach chat failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Coach chat session failed. Please check backend logs."
         )

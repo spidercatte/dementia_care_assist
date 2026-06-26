@@ -1,18 +1,19 @@
 import json
 import logging
 from google.genai import types
+from app.agents.utils import clean_json_text
 from app.schemas import PatientContextResponse
 
-logger = logging.getLogger("dementiacare-context-agent")
+logger = logging.getLogger("dementiacare-context-processor")
 
-class PatientContextAgent:
+class PatientContextProcessor:
     def __init__(self, client):
         self.client = client
 
     def run(self, patient_profile: dict) -> PatientContextResponse:
-        logger.info("Agent 2 running: Patient Context...")
+        logger.info("Step 2 running: Patient Context...")
         prompt = (
-            f"You are a Clinical Records Agent.\n"
+            f"You are a Clinical Records Processor.\n"
             f"Analyze this raw patient profile and extract a structured care context:\n"
             f"{json.dumps(patient_profile, indent=2)}\n\n"
             f"Extract the clinical stage, active triggers, personal preferences, daily routine constraints, "
@@ -28,4 +29,4 @@ class PatientContextAgent:
                 response_schema=PatientContextResponse
             )
         )
-        return PatientContextResponse.model_validate_json(response.text)
+        return PatientContextResponse.model_validate_json(clean_json_text(response.text))

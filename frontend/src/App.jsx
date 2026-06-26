@@ -227,6 +227,12 @@ function App() {
   const [analysisStep, setAnalysisStep] = useState(0); // 0: Idle, 1: Interaction Analysis, 2: Context Evaluation, 3: Guideline RAG, 4: Safety Assessment, 5: Coaching Synthesis
   const [analysisSourceType, setAnalysisSourceType] = useState(null); // 'file' or 'text'
 
+  // Coach Chat State
+  const [coachChatHistory, setCoachChatHistory] = useState([]);
+  const [coachInputText, setCoachInputText] = useState('');
+  const [isCoachLoading, setIsCoachLoading] = useState(false);
+
+
   // Translation State
   const [translationLanguage, setTranslationLanguage] = useState('original');
   const [isTranslating, setIsTranslating] = useState(false);
@@ -550,21 +556,52 @@ function App() {
                     const data = await res.json();
                     setAnalysisResult(data);
                     setAnalysisSourceType(wasFileUploaded ? 'file' : 'text');
+                    if (data.observed_behavior && data.observed_behavior !== "Input Insufficient / Invalid") {
+                      setCoachChatHistory([
+                        {
+                          role: 'assistant',
+                          content: `Hi, I am your Care Coach. I have analyzed this interaction. I noticed "${data.observed_behavior}" with a safety risk level of ${data.risk_level}. How can I support you or help you manage this situation?`
+                        }
+                      ]);
+                    } else {
+                      setCoachChatHistory([]);
+                    }
                   } else {
                     const err = await res.json();
                     alert('Error from API: ' + (err.detail || 'Unknown error'));
-                    setAnalysisResult(MOCK_ANALYSIS_MED_REFUSAL); // Fallback on failure
+                    const mockResult = MOCK_ANALYSIS_MED_REFUSAL;
+                    setAnalysisResult(mockResult); // Fallback on failure
                     setAnalysisSourceType(wasFileUploaded ? 'file' : 'text');
+                    setCoachChatHistory([
+                      {
+                        role: 'assistant',
+                        content: `Hi, I am your Care Coach. I have analyzed this interaction. I noticed "${mockResult.observed_behavior}" with a safety risk level of ${mockResult.risk_level}. How can I support you or help you manage this situation?`
+                      }
+                    ]);
                   }
                 } catch (e) {
                   alert('Connection error, using mock data: ' + e.message);
-                  setAnalysisResult(MOCK_ANALYSIS_MED_REFUSAL);
+                  const mockResult = MOCK_ANALYSIS_MED_REFUSAL;
+                  setAnalysisResult(mockResult);
                   setAnalysisSourceType(wasFileUploaded ? 'file' : 'text');
+                  setCoachChatHistory([
+                    {
+                      role: 'assistant',
+                      content: `Hi, I am your Care Coach. I have analyzed this interaction. I noticed "${mockResult.observed_behavior}" with a safety risk level of ${mockResult.risk_level}. How can I support you or help you manage this situation?`
+                    }
+                  ]);
                 }
               } else {
                 // Offline Mock Mode
-                setAnalysisResult(MOCK_ANALYSIS_MED_REFUSAL);
+                const mockResult = MOCK_ANALYSIS_MED_REFUSAL;
+                setAnalysisResult(mockResult);
                 setAnalysisSourceType(wasFileUploaded ? 'file' : 'text');
+                setCoachChatHistory([
+                  {
+                    role: 'assistant',
+                    content: `Hi, I am your Care Coach. I have analyzed this interaction. I noticed "${mockResult.observed_behavior}" with a safety risk level of ${mockResult.risk_level}. How can I support you or help you manage this situation?`
+                  }
+                ]);
               }
               setIsAnalyzing(false);
               setAnalysisStep(0);
@@ -574,6 +611,50 @@ function App() {
       });
     });
   };
+
+  const handleSendCoachMessage = async (e) => {
+    e.preventDefault();
+    if (!coachInputText.trim() || isCoachLoading) return;
+
+    const userMsg = { role: 'user', content: coachInputText };
+    const updatedHistory = [...coachChatHistory, userMsg];
+    setCoachChatHistory(updatedHistory);
+    setCoachInputText('');
+    setIsCoachLoading(true);
+
+    try {
+      if (backendStatus === 'online') {
+        const res = await secureFetch(`${BACKEND_URL}/coach/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_history: updatedHistory,
+            feedback_context: analysisResult,
+            patient_name: patient.name
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setCoachChatHistory([...updatedHistory, { role: 'assistant', content: data.response }]);
+        } else {
+          setCoachChatHistory([...updatedHistory, { role: 'assistant', content: "[COACH] I'm sorry, I ran into an error connecting to my database. Let's try again in a moment." }]);
+        }
+      } else {
+        setTimeout(() => {
+          setCoachChatHistory([...updatedHistory, {
+            role: 'assistant',
+            content: `[MOCK COACH] I hear your concern about ${patient.name}. Remember, validation therapy is key. Try validating their emotions rather than correcting facts.`
+          }]);
+        }, 1000);
+      }
+    } catch (err) {
+      console.error("Coach chat connection error:", err);
+      setCoachChatHistory([...updatedHistory, { role: 'assistant', content: "[COACH] Connection error. Please make sure the backend server is running." }]);
+    } finally {
+      setIsCoachLoading(false);
+    }
+  };
+
 
   const getMockTranslation = (result, lang) => {
     if (!result) return null;
@@ -1438,184 +1519,287 @@ function App() {
                   </div>
 
                   <div className="feedback-grid fade-in">
+                    {displayResult.observed_behavior === "Input Insufficient / Invalid" ? (
+                      <div className="feedback-full-width alert-box warning" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '2rem', textAlign: 'center', alignItems: 'center', background: 'rgba(245, 158, 11, 0.04)', border: '1px solid var(--border-color)', borderRadius: '16px' }}>
+                        <AlertTriangle size={48} style={{ color: 'var(--color-warning)' }} />
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>Validation Alert</h3>
+                        <p style={{ fontSize: '0.95rem', color: 'var(--text-light)', lineHeight: '1.5', maxWidth: '600px' }}>
+                          {displayResult.behavior_analysis?.interaction_summary || displayResult.recommended_response}
+                        </p>
 
-                    {/* Summary & Behavior Recognition */}
-                    <div className="glass-card feedback-full-width" style={{ background: 'var(--card-inner-bg)', gap: '0.75rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span className="api-status" style={{ background: 'var(--primary-glow)', border: '1px solid var(--primary)' }}>
-                          <Smile size={14} style={{ color: 'var(--primary)' }} />
-                          <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Behavioral Analysis</span>
-                        </span>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Patient Emotion: <strong>{displayResult.behavior_analysis.patient_emotion}</strong></span>
-                      </div>
-                      <p style={{ fontSize: '0.95rem', fontStyle: 'italic', color: 'var(--text-light)' }}>
-                        "{displayResult.behavior_analysis.interaction_summary}"
-                      </p>
-
-                      <div className="analysis-score-container" style={{ marginTop: '0.5rem' }}>
-                        <div className="score-box">
-                          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Patient Triggers</p>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', marginTop: '0.35rem' }}>
-                            {displayResult.behavior_analysis.patient_triggers.map((t, idx) => (
-                              <span key={idx} className="tag-pill" style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>{t}</span>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="score-box">
-                          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Caregiver Style</p>
-                          <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--primary)', marginTop: '0.35rem' }}>
-                            {displayResult.behavior_analysis.caregiver_communication_style}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Safety / Escalation Flags */}
-                    {displayResult.clinical_safety_flags && displayResult.clinical_safety_flags.length > 0 && (
-                      <div className="feedback-full-width alert-box danger">
-                        <AlertTriangle size={24} style={{ flexShrink: 0 }} />
-                        <div>
-                          <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>CRITICAL CLINICAL & SAFETY ALERTS</p>
-                          <ul style={{ paddingLeft: '1.2rem', marginTop: '0.25rem', fontSize: '0.85rem' }}>
-                            {displayResult.clinical_safety_flags.map((flag, idx) => (
-                              <li key={idx}>{flag}</li>
-                            ))}
+                        <div style={{ textAlign: 'left', background: 'var(--bg-card)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-color)', marginTop: '1rem', width: '100%', maxWidth: '600px' }}>
+                          <p style={{ fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)', fontSize: '0.9rem' }}>To receive coaching analysis, please describe:</p>
+                          <ul style={{ paddingLeft: '1.2rem', fontSize: '0.85rem', color: 'var(--text-light)', display: 'flex', flexDirection: 'column', gap: '0.5rem', listStyleType: 'disc' }}>
+                            <li>What the patient did or said (their behavior).</li>
+                            <li>What might have triggered it (e.g. being rushed, asked to take medication).</li>
+                            <li>How you responded.</li>
                           </ul>
                         </div>
                       </div>
-                    )}
-
-                    {/* Clinical Behavioral Timeline (Behavioral Coding Worksheet) */}
-                    {analysisSourceType === 'file' && displayResult.behavioral_timeline && displayResult.behavioral_timeline.length > 0 && (
-                      <div className="glass-card feedback-full-width" style={{ background: 'var(--card-inner-bg)', gap: '1rem', border: '1px solid var(--border-color)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <Activity size={18} style={{ color: 'var(--primary)' }} />
-                          <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
-                            Clinical Behavioral Timeline
-                          </h3>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--primary)', marginLeft: 'auto', background: 'var(--primary-glow)', border: '1px solid var(--primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
-                            Behavioral Coding Worksheet
-                          </span>
-                        </div>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                          Chronological mapping of specific timeframes to observable patient behaviors, clinical symptoms, and underlying cognitive or emotional states.
-                        </p>
-                        <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
-                          <table className="timeline-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-                            <thead>
-                              <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
-                                <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600, width: '120px' }}>Timeframe</th>
-                                <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>Observable Behavior / Speech</th>
-                                <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600, width: '220px' }}>Clinical Symptom Term</th>
-                                <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>Underlying Emotion / Cognitive State</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {displayResult.behavioral_timeline.map((obs, idx) => (
-                                <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)', verticalAlign: 'top' }}>
-                                  <td style={{ padding: '0.8rem' }}>
-                                    <span className="tag-pill" style={{ background: 'var(--primary-glow)', border: '1px solid var(--primary)', color: 'var(--primary)', fontWeight: 600, display: 'inline-block', fontSize: '0.8rem' }}>
-                                      {obs.timeframe}
-                                    </span>
-                                  </td>
-                                  <td style={{ padding: '0.8rem', color: 'var(--text-light)', lineHeight: '1.4' }}>
-                                    {obs.observable_behavior}
-                                  </td>
-                                  <td style={{ padding: '0.8rem' }}>
-                                    <span style={{
-                                      background: 'var(--symptom-tag-bg)',
-                                      border: '1px solid var(--symptom-tag-border)',
-                                      color: 'var(--symptom-tag-color)',
-                                      fontSize: '0.8rem',
-                                      padding: '0.15rem 0.4rem',
-                                      borderRadius: '4px',
-                                      fontWeight: 500,
-                                      display: 'inline-block'
-                                    }}>
-                                      {obs.clinical_symptom}
-                                    </span>
-                                  </td>
-                                  <td style={{ padding: '0.8rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', lineHeight: '1.4' }}>
-                                    {obs.cognitive_state}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Strengths */}
-                    <div className="glass-card" style={{ gap: '0.75rem' }}>
-                      <h3 style={{ fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-success)' }}>
-                        <ThumbsUp size={16} />
-                        Caregiver Strengths
-                      </h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        {displayResult.strengths.map((str, idx) => (
-                          <div key={idx} className="check-item success">
-                            <CheckCircle2 size={16} />
-                            <span>{str}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Opportunities */}
-                    <div className="glass-card" style={{ gap: '0.75rem' }}>
-                      <h3 style={{ fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-warning)' }}>
-                        <AlertTriangle size={16} />
-                        Opportunities to Improve
-                      </h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        {displayResult.opportunities_for_improvement.map((opp, idx) => (
-                          <div key={idx} className="check-item opportunity">
-                            <AlertTriangle size={16} />
-                            <span>{opp}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Dialogue Coaching Scripts */}
-                    <div className="glass-card feedback-full-width" style={{ gap: '0.75rem' }}>
-                      <h3 style={{ fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--secondary)' }}>
-                        <MessageSquare size={16} />
-                        Recommended Dialogue Scripts (What to say)
-                      </h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
-                        {displayResult.coaching_scripts.map((script, idx) => {
-                          const isAvoid = script.startsWith("Avoid saying:");
-                          return (
-                            <div key={idx} className={`dialogue-line ${isAvoid ? 'avoid' : 'try'}`}>
-                              <strong>{isAvoid ? 'AVOID:' : 'TRY SAYING:'}</strong> {script.replace("Avoid saying:", "").replace("Try saying:", "")}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Clinical Recommendations */}
-                    <div className="feedback-full-width" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
-                      <h3 style={{ fontSize: '1.1rem', fontWeight: 600, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                        Clinical Care Protocols
-                      </h3>
-
-                      {displayResult.recommendations.map((rec, idx) => (
-                        <div key={idx} className="glass-card" style={{ background: 'var(--secondary-glow-bg)', border: '1px solid var(--secondary-glow-border)' }}>
+                    ) : (
+                      <>
+                        {/* Summary & Behavior Recognition */}
+                        <div className="glass-card feedback-full-width" style={{ background: 'var(--card-inner-bg)', gap: '0.75rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 700, color: 'var(--secondary)' }}>{rec.strategy_name}</span>
-                            <span className="api-status" style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}>Grounded Advice</span>
+                            <span className="api-status" style={{ background: 'var(--primary-glow)', border: '1px solid var(--primary)' }}>
+                              <Smile size={14} style={{ color: 'var(--primary)' }} />
+                              <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Behavioral Analysis</span>
+                            </span>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Patient Emotion: <strong>{displayResult.behavior_analysis.patient_emotion}</strong></span>
                           </div>
-                          <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>{rec.description}</p>
-                          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
-                            <strong>Why this works:</strong> {rec.rationality}
+                          <p style={{ fontSize: '0.95rem', fontStyle: 'italic', color: 'var(--text-light)' }}>
+                            "{displayResult.behavior_analysis.interaction_summary}"
                           </p>
-                        </div>
-                      ))}
-                    </div>
 
+                          <div className="analysis-score-container" style={{ marginTop: '0.5rem' }}>
+                            <div className="score-box">
+                              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Patient Triggers</p>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', marginTop: '0.35rem' }}>
+                                {displayResult.behavior_analysis.patient_triggers.map((t, idx) => (
+                                  <span key={idx} className="tag-pill" style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>{t}</span>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="score-box">
+                              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Caregiver Style</p>
+                              <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--primary)', marginTop: '0.35rem' }}>
+                                {displayResult.behavior_analysis.caregiver_communication_style}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Safety / Escalation Flags */}
+                        {displayResult.clinical_safety_flags && displayResult.clinical_safety_flags.length > 0 && (
+                          <div className="feedback-full-width alert-box danger">
+                            <AlertTriangle size={24} style={{ flexShrink: 0 }} />
+                            <div>
+                              <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>CRITICAL CLINICAL & SAFETY ALERTS</p>
+                              <ul style={{ paddingLeft: '1.2rem', marginTop: '0.25rem', fontSize: '0.85rem' }}>
+                                {displayResult.clinical_safety_flags.map((flag, idx) => (
+                                  <li key={idx}>{flag}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Clinical Behavioral Timeline (Behavioral Coding Worksheet) */}
+                        {analysisSourceType === 'file' && displayResult.behavioral_timeline && displayResult.behavioral_timeline.length > 0 && (
+                          <div className="glass-card feedback-full-width" style={{ background: 'var(--card-inner-bg)', gap: '1rem', border: '1px solid var(--border-color)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <Activity size={18} style={{ color: 'var(--primary)' }} />
+                              <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                                Clinical Behavioral Timeline
+                              </h3>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--primary)', marginLeft: 'auto', background: 'var(--primary-glow)', border: '1px solid var(--primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
+                                Behavioral Coding Worksheet
+                              </span>
+                            </div>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                              Chronological mapping of specific timeframes to observable patient behaviors, clinical symptoms, and underlying cognitive or emotional states.
+                            </p>
+                            <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
+                              <table className="timeline-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                                <thead>
+                                  <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                                    <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600, width: '120px' }}>Timeframe</th>
+                                    <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>Observable Behavior / Speech</th>
+                                    <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600, width: '220px' }}>Clinical Symptom Term</th>
+                                    <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>Underlying Emotion / Cognitive State</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {displayResult.behavioral_timeline.map((obs, idx) => (
+                                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)', verticalAlign: 'top' }}>
+                                      <td style={{ padding: '0.8rem' }}>
+                                        <span className="tag-pill" style={{ background: 'var(--primary-glow)', border: '1px solid var(--primary)', color: 'var(--primary)', fontWeight: 600, display: 'inline-block', fontSize: '0.8rem' }}>
+                                          {obs.timeframe}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '0.8rem', color: 'var(--text-light)', lineHeight: '1.4' }}>
+                                        {obs.observable_behavior}
+                                      </td>
+                                      <td style={{ padding: '0.8rem' }}>
+                                        <span style={{
+                                          background: 'var(--symptom-tag-bg)',
+                                          border: '1px solid var(--symptom-tag-border)',
+                                          color: 'var(--symptom-tag-color)',
+                                          fontSize: '0.8rem',
+                                          padding: '0.15rem 0.4rem',
+                                          borderRadius: '4px',
+                                          fontWeight: 500,
+                                          display: 'inline-block'
+                                        }}>
+                                          {obs.clinical_symptom}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '0.8rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', lineHeight: '1.4' }}>
+                                        {obs.cognitive_state}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Strengths */}
+                        <div className="glass-card" style={{ gap: '0.75rem' }}>
+                          <h3 style={{ fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-success)' }}>
+                            <ThumbsUp size={16} />
+                            Caregiver Strengths
+                          </h3>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {displayResult.strengths.map((str, idx) => (
+                              <div key={idx} className="check-item success">
+                                <CheckCircle2 size={16} />
+                                <span>{str}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Opportunities */}
+                        <div className="glass-card" style={{ gap: '0.75rem' }}>
+                          <h3 style={{ fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-warning)' }}>
+                            <AlertTriangle size={16} />
+                            Opportunities to Improve
+                          </h3>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {displayResult.opportunities_for_improvement.map((opp, idx) => (
+                              <div key={idx} className="check-item opportunity">
+                                <AlertTriangle size={16} />
+                                <span>{opp}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Dialogue Coaching Scripts */}
+                        <div className="glass-card feedback-full-width" style={{ gap: '0.75rem' }}>
+                          <h3 style={{ fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--secondary)' }}>
+                            <MessageSquare size={16} />
+                            Recommended Dialogue Scripts (What to say)
+                          </h3>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+                            {displayResult.coaching_scripts.map((script, idx) => {
+                              const isAvoid = script.startsWith("Avoid saying:");
+                              return (
+                                <div key={idx} className={`dialogue-line ${isAvoid ? 'avoid' : 'try'}`}>
+                                  <strong>{isAvoid ? 'AVOID:' : 'TRY SAYING:'}</strong> {script.replace("Avoid saying:", "").replace("Try saying:", "")}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Clinical Recommendations */}
+                        <div className="feedback-full-width" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
+                          <h3 style={{ fontSize: '1.1rem', fontWeight: 600, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                            Clinical Care Protocols
+                          </h3>
+
+                          {displayResult.recommendations.map((rec, idx) => (
+                            <div key={idx} className="glass-card" style={{ background: 'var(--secondary-glow-bg)', border: '1px solid var(--secondary-glow-border)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontWeight: 700, color: 'var(--secondary)' }}>{rec.strategy_name}</span>
+                                <span className="api-status" style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}>Grounded Advice</span>
+                              </div>
+                              <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>{rec.description}</p>
+                              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
+                                <strong>Why this works:</strong> {rec.rationality}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Conversational Coach Follow-up Chat */}
+                        {coachChatHistory && coachChatHistory.length > 0 && (
+                          <div className="feedback-full-width glass-card" style={{ marginTop: '2rem', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--card-inner-bg)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <MessageSquare size={20} style={{ color: 'var(--primary)' }} />
+                              <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                                Ask follow-up questions to your Care Coach
+                              </h3>
+                              <span className="api-status" style={{ marginLeft: 'auto', background: 'var(--primary-glow)', border: '1px solid var(--primary)', color: 'var(--primary)', fontWeight: 600 }}>
+                                Live Session
+                              </span>
+                            </div>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                              Have questions about the recommendations or want to brainstorm alternative strategies? Ask your coach below.
+                            </p>
+
+                            {/* Chat Thread */}
+                            <div className="chat-history" style={{
+                              maxHeight: '300px',
+                              overflowY: 'auto',
+                              background: 'var(--bg-dark)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '1rem',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.75rem'
+                            }}>
+                              {coachChatHistory.map((msg, index) => (
+                                <div
+                                  key={index}
+                                  className={`chat-bubble ${msg.role === 'user' ? 'caregiver' : 'patient'}`}
+                                  style={{
+                                    alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                                    background: msg.role === 'user' ? 'var(--primary)' : 'var(--bg-card)',
+                                    color: msg.role === 'user' ? '#fff' : 'var(--text-main)',
+                                    border: msg.role === 'user' ? 'none' : '1px solid var(--border-color)',
+                                    borderRadius: '12px',
+                                    padding: '0.6rem 1rem',
+                                    maxWidth: '80%',
+                                    fontSize: '0.9rem',
+                                    lineHeight: '1.4'
+                                  }}
+                                >
+                                  {msg.content}
+                                </div>
+                              ))}
+
+                              {isCoachLoading && (
+                                <div className="chat-bubble patient" style={{
+                                  alignSelf: 'flex-start',
+                                  background: 'var(--bg-card)',
+                                  color: 'var(--text-muted)',
+                                  border: '1px solid var(--border-color)',
+                                  borderRadius: '12px',
+                                  padding: '0.6rem 1rem',
+                                  fontSize: '0.9rem',
+                                  opacity: 0.6
+                                }}>
+                                  <RefreshCw className="spinner" size={14} style={{ display: 'inline-block', marginRight: '0.5rem' }} />
+                                  Coach is typing...
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Input Form */}
+                            <form onSubmit={handleSendCoachMessage} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                              <input
+                                type="text"
+                                className="form-input"
+                                style={{ flex: 1, background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: 'var(--text-main)', padding: '0.6rem 1rem', borderRadius: '8px' }}
+                                placeholder="Ask your coach anything about this situation..."
+                                value={coachInputText}
+                                onChange={(e) => setCoachInputText(e.target.value)}
+                                disabled={isCoachLoading}
+                              />
+                              <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem 1.5rem', borderRadius: '8px' }} disabled={isCoachLoading || !coachInputText.trim()}>
+                                Send
+                              </button>
+                            </form>
+                          </div>
+                        )}
+                      </>
+
+                    )}
                   </div>
                 </>
               )}

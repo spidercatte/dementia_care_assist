@@ -126,5 +126,5 @@ root_agent = Agent(
 
 app = App(
     root_agent=root_agent,
-    name="dementiacare-coach-app",
+    name="app",
 )

@@ -13,7 +13,7 @@ from app.schemas import (
     CareGuidanceResponse,
     SafetyEscalationResponse
 )
-from app.agents.caregiver_coaching import CaregiverCoachingAgent
+from app.agents.caregiver_coaching import CoachingSynthesizer
 
 # Load eval cases from dataset
 EVAL_DATASET_PATH = os.path.join(os.path.dirname(__file__), "eval_dataset.json")
@@ -107,11 +107,11 @@ def gemini_client():
 
 
 @pytest.mark.parametrize("case", eval_cases)
-def test_caregiver_coaching_agent(gemini_client, case):
+def test_coaching_synthesizer(gemini_client, case):
     """
-    Evaluates the Caregiver Coaching Agent (Agent 5) on response empathy and scripts.
+    Evaluates the Coaching Synthesizer (Step 5) on response empathy and scripts.
     """
-    agent = CaregiverCoachingAgent(gemini_client)
+    synthesizer = CoachingSynthesizer(gemini_client)
 
     # Construct input values
     analysis = InteractionAnalysisResponse(
@@ -154,8 +154,8 @@ def test_caregiver_coaching_agent(gemini_client, case):
         escalate_to_clinician=case["expected"]["escalate_to_clinician"]
     )
 
-    # Run the agent
-    response = agent.run(
+    # Run the synthesizer
+    response = synthesizer.run(
         analysis=analysis,
         context=context,
         guidance=guidance,

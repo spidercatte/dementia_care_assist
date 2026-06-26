@@ -88,3 +88,11 @@ class FinalCoachingResponse(BaseModel):
 class TranslationRequest(BaseModel):
     coaching_response: FinalCoachingResponse
     target_language: str
+
+# ==========================================
+# 7. Intake Validation Schema
+# ==========================================
+class ValidationResponse(BaseModel):
+    is_valid: bool = Field(description="True if the input contains a valid caregiver-patient interaction related to dementia care, False otherwise.")
+    summary: Optional[str] = Field(None, description="A 1-sentence summary of the interaction if valid, or null if invalid.")
+    reason: Optional[str] = Field(None, description="A clear rejection reason if invalid, or null if valid.")

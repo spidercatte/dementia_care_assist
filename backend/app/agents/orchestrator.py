@@ -4,16 +4,17 @@ from google import genai
 from google.genai import errors
 
 from app.config import settings
-from app.schemas import FinalCoachingResponse, BehaviorRecognition, Recommendation
+from app.schemas import FinalCoachingResponse, BehaviorRecognition, Recommendation, ValidationResponse
 from app.mock_responses import get_mock_coaching_response
 from app.rag import query_guidelines
 
-# Import specialized agents
-from app.agents.interaction_analysis import InteractionAnalysisAgent
-from app.agents.patient_context import PatientContextAgent
-from app.agents.care_guidance import CareGuidanceAgent
-from app.agents.safety_escalation import SafetyEscalationAgent
-from app.agents.caregiver_coaching import CaregiverCoachingAgent
+# Import specialized pipeline services
+from app.agents.validation import ValidationService
+from app.agents.interaction_analysis import InteractionAnalyzer
+from app.agents.patient_context import PatientContextProcessor
+from app.agents.care_guidance import CareGuidanceService
+from app.agents.safety_escalation import SafetyEvaluator
+from app.agents.caregiver_coaching import CoachingSynthesizer
 
 logger = logging.getLogger("dementiacare-orchestrator")
 
@@ -32,13 +33,15 @@ def is_nonsensical_or_too_short(text: str) -> bool:
         return True
     return False
 
-def get_invalid_input_response(description: str) -> FinalCoachingResponse:
+def get_invalid_input_response(description: str, rejection_reason: str = None) -> FinalCoachingResponse:
+    reason_prefix = f"Rejection Reason: {rejection_reason}\n\n" if rejection_reason else ""
     return FinalCoachingResponse(
         observed_behavior="Input Insufficient / Invalid",
         likely_trigger="N/A - Insufficient description details",
         caregiver_pattern="N/A",
         risk_level="LOW",
         recommended_response=(
+            f"{reason_prefix}"
             "Please describe a specific interaction between a caregiver and a patient with dementia. "
             "To get the best clinical analysis and coaching script, try including:\n"
             "1. What the patient said or did (their behavior).\n"
@@ -53,7 +56,7 @@ def get_invalid_input_response(description: str) -> FinalCoachingResponse:
             patient_emotion="N/A",
             patient_triggers=[],
             caregiver_communication_style="N/A",
-            interaction_summary=f"The input '{description}' is too short or doesn't describe a dementia care interaction."
+            interaction_summary=rejection_reason or f"The input '{description}' is too short or doesn't describe a dementia care interaction."
         ),
         strengths=[],
         opportunities_for_improvement=[],
@@ -89,12 +92,13 @@ class OrchestratorAgent:
         else:
             try:
                 self.client = genai.Client(api_key=settings.gemini_api_key)
-                # Initialize sub-agents
-                self.analyzer = InteractionAnalysisAgent(self.client)
-                self.context_expert = PatientContextAgent(self.client)
-                self.guidance_expert = CareGuidanceAgent(self.client)
-                self.safety_expert = SafetyEscalationAgent(self.client)
-                self.coach = CaregiverCoachingAgent(self.client)
+                # Initialize sub-services
+                self.validator = ValidationService(self.client)
+                self.analyzer = InteractionAnalyzer(self.client)
+                self.context_expert = PatientContextProcessor(self.client)
+                self.guidance_expert = CareGuidanceService(self.client)
+                self.safety_expert = SafetyEvaluator(self.client)
+                self.coach = CoachingSynthesizer(self.client)
             except Exception as e:
                 logger.error(f"Failed to initialize Gemini Client: {e}. Falling back to MOCK mode.")
                 self.use_mock = True
@@ -113,19 +117,23 @@ class OrchestratorAgent:
             return get_mock_coaching_response(description_text or "Default Care Interaction Log")
 
         try:
-            # Step 1: Interaction Analysis Agent
-            analysis = self.analyzer.run(contents)
-            logger.info("Step 1 Complete.")
-
-            # Check if the interaction analysis detected invalid/nonsensical content
-            if "insufficient" in analysis.observed_behavior.lower() or "invalid" in analysis.observed_behavior.lower():
+            # Step 0: Intake Validation Service
+            validation = self.validator.run(contents)
+            logger.info(f"Step 0 (Intake Validation) Complete. Valid: {validation.is_valid}")
+            if not validation.is_valid:
                 description_name = "the uploaded file"
                 for item in contents:
                     if isinstance(item, str):
                         description_name = f"'{item}'"
-                return get_invalid_input_response(description_name)
+                return get_invalid_input_response(description_name, validation.reason)
 
-            # Step 2: Patient Context Agent
+            # Step 1: Interaction Analysis (Analyzer)
+            # Pass the validation summary alongside original media to prime the analyzer
+            analysis_contents = contents + [f"Validation Intake Summary: {validation.summary}"]
+            analysis = self.analyzer.run(analysis_contents)
+            logger.info("Step 1 Complete.")
+
+            # Step 2: Patient Context Processor
             context = self.context_expert.run(patient_profile)
             logger.info("Step 2 Complete.")
 
@@ -137,7 +145,7 @@ class OrchestratorAgent:
                 for doc in retrieved_docs
             ])
 
-            # Step 3: Care Guidance Agent
+            # Step 3: Care Guidance Service
             context_summary = (
                 f"Clinical Stage: {context.clinical_stage}\n"
                 f"Active Triggers: {', '.join(context.active_triggers)}\n"
@@ -152,7 +160,7 @@ class OrchestratorAgent:
             )
             logger.info("Step 3 Complete.")
 
-            # Step 4: Safety / Escalation Agent
+            # Step 4: Safety / Escalation Evaluator
             safety = self.safety_expert.run(
                 interaction_summary=analysis.observed_behavior + " - " + analysis.non_verbal_cues,
                 health_risk_factors=context.health_risk_factors,
@@ -160,7 +168,7 @@ class OrchestratorAgent:
             )
             logger.info("Step 4 Complete.")
 
-            # Step 5: Caregiver Coaching Agent (Consolidation)
+            # Step 5: Caregiver Coaching Synthesis (Synthesizer)
             final_response = self.coach.run(
                 analysis=analysis,
                 context=context,

@@ -1,20 +1,20 @@
 import logging
 from google.genai import types
+from app.agents.utils import clean_json_text
 from app.schemas import InteractionAnalysisResponse
 
-logger = logging.getLogger("dementiacare-interaction-agent")
+logger = logging.getLogger("dementiacare-interaction-analyzer")
 
-class InteractionAnalysisAgent:
+class InteractionAnalyzer:
     def __init__(self, client):
         self.client = client
 
     def run(self, contents: list) -> InteractionAnalysisResponse:
-        logger.info("Agent 1 running: Interaction Analysis...")
+        logger.info("Step 1 running: Interaction Analysis...")
         prompt = (
-            "You are a specialized Interaction Analysis Agent in a dementia care clinic.\n"
+            "You are a specialized Interaction Analyzer in a dementia care clinic.\n"
             "Your task is to analyze the caregiver-patient interaction (which may be a video, audio, or a written text description).\n"
             "Identify the patient's observed behavior, likely trigger, and caregiver response pattern.\n"
-            "If the provided content (video, audio, or text) does not contain a recognizable caregiver-patient interaction or is completely unrelated to dementia care (e.g. blank media, pure noise, random objects, greetings, or non-sensical inputs), you MUST set the field `observed_behavior` to strictly read 'Input Insufficient / Invalid' and fill out other fields with placeholder/generic values.\n"
             "Determine the patient's agitation level (1-10), confusion level (1-10), verbal summary, and non-verbal cues.\n"
             "Provide a 2-3 word search query to look up clinical care guidelines for this specific behavior.\n"
             "Additionally, extract a chronological behavioral_timeline of observation points mapping specific timeframes "
@@ -31,4 +31,4 @@ class InteractionAnalysisAgent:
                 response_schema=InteractionAnalysisResponse
             )
         )
-        return InteractionAnalysisResponse.model_validate_json(response.text)
+        return InteractionAnalysisResponse.model_validate_json(clean_json_text(response.text))
