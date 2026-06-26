@@ -51,6 +51,14 @@ const MOCK_ARTHUR = {
 };
 
 const MOCK_ANALYSIS_MED_REFUSAL = {
+  observed_behavior: "Medication Refusal & Theft Paranoia",
+  likely_trigger: "Direct correction and rushing the medication schedule",
+  caregiver_pattern: "Defensive, trying to logically prove the patient is wrong",
+  risk_level: "MEDIUM",
+  recommended_response: "Acknowledge the fear of theft/poisoning, remove the trigger (the pill bottle), and redirect to a calming sensory activity before offering the medication in a soft food like applesauce.",
+  try_saying: "I see you want to make sure your money is safe, Mom. I'll lock everything in the desk drawer. Let's have a cup of warm tea first.",
+  avoid_saying: "You didn't take your pills! Stop saying I'm stealing, I'm your daughter and the doctor ordered these!",
+  safety_note: "If cardiac medication is missed for more than 48 hours, contact her cardiologist. Ensure she does not hide pills in her mouth.",
   behavior_analysis: {
     patient_emotion: "agitated and suspicious",
     patient_triggers: ["direct correction ('you must take this now')", "rushing"],
@@ -451,6 +459,23 @@ function App() {
     }
   };
 
+  const loadInteractionLogs = async (name) => {
+    if (!name) return;
+    try {
+      if (backendStatus === 'online') {
+        const intRes = await secureFetch(`${BACKEND_URL}/patient/${name}/interactions`);
+        if (intRes.ok) {
+          const logs = await intRes.json();
+          setInteractionLogs(logs);
+        }
+      } else {
+        setInteractionLogs([]);
+      }
+    } catch (e) {
+      console.error("Error loading interaction logs:", e);
+    }
+  };
+
   const handleApplySuggestedUpdate = async (type, value) => {
     if (!value) return;
     let updatedPatient = { ...patient };
@@ -650,7 +675,7 @@ function App() {
                     } else {
                       setSuggestedUpdates(null);
                     }
-                    loadPatientHistory(patient.name);
+                    loadInteractionLogs(patient.name);
                     if (data.observed_behavior && data.observed_behavior !== "Input Insufficient / Invalid") {
                       setCoachChatHistory([
                         {
