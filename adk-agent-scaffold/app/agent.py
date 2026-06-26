@@ -81,13 +81,33 @@ def call_mcp_tool(name: str, arguments: dict | None = None) -> str:
         return f"Error executing MCP tool '{name}': {e}"
 
 
-def get_patient_profile() -> str:
-    """Retrieves the active patient's background, dementia staging, triggers, preferences, and daily constraints from the database.
+def get_patient_profile(name: str = "") -> str:
+    """Retrieves a patient's full clinical profile from the database, including dementia staging,
+    behavioral triggers, comfort preferences, medications, medical conditions, allergies, fall risk,
+    mobility/sensory aids, diet texture, and caregiver care notes.
+
+    Args:
+        name: Name of the patient (e.g. 'Maria', 'Arthur'). Leave empty to get the default patient.
 
     Returns:
-        A formatted JSON string of the patient's profile context.
+        A formatted JSON string of the patient's complete profile.
     """
-    return call_mcp_tool("get_patient_profile")
+    args = {"name": name} if name else {}
+    return call_mcp_tool("get_patient_profile", args)
+
+
+def search_patients(query: str) -> str:
+    """Searches patient profiles to find patients matching a clinical description or name.
+    Use this to identify which patient to load before calling get_patient_profile.
+
+    Args:
+        query: A natural language description or name to search for
+               (e.g. 'patient with Lewy Body dementia', 'high fall risk', 'Maria').
+
+    Returns:
+        A JSON string containing matching patient profile summaries.
+    """
+    return call_mcp_tool("search_patients", {"query": query})
 
 
 def log_safety_escalation(urgency_level: str, safety_reason: str) -> str:
@@ -133,7 +153,9 @@ root_agent = Agent(
         "You are the lead DementiaCare Coach AI Agent. Your role is to provide kind, compassionate, "
         "and evidence-based coaching to dementia caregivers.\n\n"
         "When a caregiver describes an interaction, always follow this protocol:\n"
-        "1. Retrieve the patient's context using get_patient_profile() to check their stage and active triggers.\n"
+        "1. If the patient's name is mentioned, use search_patients() to find them, then load their full "
+        "   profile with get_patient_profile(name=...). If no name is given, call get_patient_profile() "
+        "   with no arguments to load the default patient.\n"
         "2. Query relevant care guidelines for the behaviors displayed using query_care_guidelines() with a short behavior keyword.\n"
         "3. If there are safety hazards (e.g. falls, medication danger, severe pacing, wandering), log it using log_safety_escalation().\n"
         "4. Synthesize the findings and output caregiver feedback. Provide:\n"
@@ -141,10 +163,11 @@ root_agent = Agent(
         "   - Caregiver strengths (what they did well).\n"
         "   - Opportunities to improve (specifically calling out corrections/logical traps they fell into).\n"
         "   - Actionable dialog scripts: 'Avoid saying: ...' and 'Try saying: ...' customized to the scenario.\n"
-        "   - Clear clinical guidelines and recommendations.\n\n"
+        "   - Clear clinical guidelines and recommendations.\n"
+        "   - Reference the patient's care_notes for approach-specific guidance.\n\n"
         "Do not offer dry medical summaries; be highly actionable, supportive, and kind."
     ),
-    tools=[get_patient_profile, log_safety_escalation, query_care_guidelines],
+    tools=[get_patient_profile, search_patients, log_safety_escalation, query_care_guidelines],
 )
 
 app = App(

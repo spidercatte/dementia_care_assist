@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     admin_api_key: str = ""
     user_api_key: str = ""
 
+    # Vertex AI Search Settings
+    vertex_search_project_id: str = ""
+    vertex_search_location: str = "global"
+    vertex_search_datastore_id: str = ""
+    vertex_patient_datastore_id: str = ""
+
     # RAG / Database Settings
     chroma_db_path: str = "chroma_db"
     chroma_server_host: str = ""
@@ -33,7 +39,9 @@ class Settings(BaseSettings):
         "http://localhost:5174", "http://127.0.0.1:5174",
         "http://localhost:5175", "http://127.0.0.1:5175",
         "http://localhost:5176", "http://127.0.0.1:5176",
-        "http://localhost:3000", "http://127.0.0.1:3000"
+        "http://localhost:3000", "http://127.0.0.1:3000",
+        "https://adk-agent-scaffold-frontend-giva6hsktq-ue.a.run.app",
+        "https://adk-agent-scaffold-frontend-264210343126.us-east1.run.app"
     ]
 
     model_config = SettingsConfigDict(

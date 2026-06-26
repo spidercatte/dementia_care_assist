@@ -14,6 +14,13 @@
         "@modelcontextprotocol/server-sqlite",
         "/workspaces/dementia_care_assist/backend/dementia_care.db"
       ]
+    },
+    "discoveryengine": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "npx -y mcp-remote https://discoveryengine.googleapis.com/mcp --header \"Authorization: Bearer $(gcloud auth print-access-token)\""
+      ]
     }
   }
 }

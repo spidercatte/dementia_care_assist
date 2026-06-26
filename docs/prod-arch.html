@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>DementiaCare Coach — Prod Architecture</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Courier New', monospace; background: #f5f5f5; padding: 32px; color: #111; }
+  h1 { font-size: 16px; font-weight: bold; text-align: center; margin-bottom: 28px; letter-spacing: 1px; text-transform: uppercase; }
+
+  .canvas { display: flex; flex-direction: column; gap: 20px; max-width: 960px; margin: 0 auto; }
+
+  /* Row layouts */
+  .row { display: flex; gap: 16px; align-items: stretch; }
+  .row.center { justify-content: center; }
+
+  /* Generic box */
+  .box {
+    border: 2px solid #222;
+    background: #fff;
+    padding: 10px 14px;
+    font-size: 11px;
+    line-height: 1.6;
+    min-width: 100px;
+  }
+  .box .label {
+    font-size: 9px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+    margin-bottom: 4px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 3px;
+  }
+  .box .title { font-weight: bold; font-size: 12px; }
+  .box .sub { font-size: 10px; color: #444; margin-top: 2px; }
+  .box .items { font-size: 10px; color: #333; margin-top: 4px; padding-left: 0; list-style: none; }
+  .box .items li::before { content: "· "; }
+
+  /* Cloud boundary */
+  .cloud {
+    border: 2px dashed #555;
+    padding: 16px;
+    background: #fafafa;
+  }
+  .cloud > .cloud-label {
+    font-size: 9px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+    margin-bottom: 12px;
+  }
+
+  /* Section grouping */
+  .group {
+    border: 1px solid #bbb;
+    padding: 12px;
+    background: #f9f9f9;
+  }
+  .group > .group-label {
+    font-size: 9px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #777;
+    margin-bottom: 10px;
+  }
+
+  /* Arrow connector */
+  .arrow { display: flex; align-items: center; justify-content: center; font-size: 16px; color: #333; padding: 0 4px; flex-shrink: 0; }
+  .arrow-down { text-align: center; font-size: 16px; color: #333; line-height: 1; margin: 2px auto; }
+  .arrow-label { font-size: 9px; color: #555; text-align: center; }
+
+  /* Connector column */
+  .connector { display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; gap: 2px; }
+
+  /* Full width */
+  .full { flex: 1; }
+
+  /* Agent pipeline */
+  .pipeline { display: flex; align-items: center; gap: 0; }
+  .agent-box {
+    border: 2px solid #222;
+    background: #fff;
+    padding: 8px 10px;
+    font-size: 10px;
+    text-align: center;
+    min-width: 90px;
+  }
+  .agent-box .num { font-size: 9px; color: #777; }
+  .agent-box .name { font-weight: bold; font-size: 10px; }
+  .pipe-arrow { font-size: 14px; padding: 0 2px; color: #333; }
+
+  /* Dashed / secondary box */
+  .box.dashed { border-style: dashed; border-color: #999; background: #fafafa; }
+
+  /* Color fills */
+  .box.dark  { background: #222; color: #fff; border-color: #000; }
+  .box.dark .label, .box.dark .sub, .box.dark .items { color: #ccc; }
+  .box.shade { background: #eee; }
+
+  hr.sep { border: none; border-top: 1px dashed #ccc; margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<h1>DementiaCare Coach — Production Architecture Wireframe</h1>
+
+<div class="canvas">
+
+  <!-- ROW 1: User -->
+  <div class="row center">
+    <div class="box dark" style="text-align:center; padding: 12px 24px;">
+      <div class="title">👤 Caregiver</div>
+      <div class="sub">Browser · HTTPS</div>
+    </div>
+  </div>
+
+  <div class="arrow-down">↓ HTTPS</div>
+
+  <!-- ROW 2: Cloud Run Services -->
+  <div class="cloud">
+    <div class="cloud-label">☁️ Google Cloud Platform — Single Project</div>
+
+    <div class="row" style="margin-bottom: 16px;">
+      <!-- Frontend -->
+      <div class="box full">
+        <div class="label">Cloud Run · Frontend</div>
+        <div class="title">React SPA</div>
+        <div class="sub">Nginx · port :80</div>
+        <div class="sub">gcr.io/.../frontend:latest</div>
+      </div>
+
+      <div class="connector">
+        <span style="font-size:11px; color:#555;">REST API</span>
+        <span style="font-size:18px;">→</span>
+        <span style="font-size:9px; color:#555;">/analyze /coach</span>
+        <span style="font-size:9px; color:#555;">/patient /simulator</span>
+      </div>
+
+      <!-- Backend -->
+      <div class="box full">
+        <div class="label">Cloud Run · Backend</div>
+        <div class="title">FastAPI + MCP Server</div>
+        <div class="sub">Python · port :8000</div>
+        <div class="sub">gcr.io/.../backend:latest</div>
+      </div>
+
+      <div class="connector">
+        <span style="font-size:18px;">→</span>
+        <span style="font-size:9px; color:#555;">Inference API</span>
+        <span style="font-size:9px; color:#555;">text + video/audio</span>
+      </div>
+
+      <!-- Gemini -->
+      <div class="box dashed full">
+        <div class="label">External API</div>
+        <div class="title">Google Gemini API</div>
+        <div class="sub">gemini-2.0-flash</div>
+        <div class="sub">Multimodal</div>
+      </div>
+    </div>
+
+    <div class="arrow-down">↓ orchestrates</div>
+
+    <!-- ROW 3: 5-Agent Pipeline -->
+    <div class="group" style="margin-bottom: 16px;">
+      <div class="group-label">5-Agent Orchestration Pipeline</div>
+      <div class="pipeline">
+        <div class="agent-box">
+          <div class="num">①</div>
+          <div class="name">Validation</div>
+        </div>
+        <span class="pipe-arrow">→</span>
+        <div class="agent-box">
+          <div class="num">②</div>
+          <div class="name">Interaction<br/>Analysis</div>
+        </div>
+        <span class="pipe-arrow">→</span>
+        <div class="agent-box">
+          <div class="num">③</div>
+          <div class="name">Patient<br/>Context</div>
+        </div>
+        <span class="pipe-arrow">→</span>
+        <div class="agent-box">
+          <div class="num">④</div>
+          <div class="name">Care Guidance<br/>RAG</div>
+        </div>
+        <span class="pipe-arrow">→</span>
+        <div class="agent-box">
+          <div class="num">⑤</div>
+          <div class="name">Safety<br/>Escalation</div>
+        </div>
+        <span class="pipe-arrow">→</span>
+        <div class="agent-box">
+          <div class="num">⑥</div>
+          <div class="name">Coaching<br/>Synthesis</div>
+        </div>
+      </div>
+      <div style="margin-top:10px; display:flex; gap:8px;">
+        <div class="agent-box" style="min-width:auto; flex:1;">
+          <div class="name">Conversational Coach Agent</div>
+        </div>
+        <div class="agent-box" style="min-width:auto; flex:1;">
+          <div class="name">Simulator Agent</div>
+        </div>
+        <div class="agent-box" style="min-width:auto; flex:1;">
+          <div class="name">Profile Enricher Agent</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW 4: Data + Security + Observability -->
+    <div class="row" style="gap: 12px;">
+
+      <!-- Data Layer -->
+      <div class="group full">
+        <div class="group-label">Data Layer</div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div class="box">
+            <div class="label">Cloud SQL · PostgreSQL 15</div>
+            <div class="sub">Cloud SQL Auth Proxy · Unix Socket</div>
+            <ul class="items">
+              <li>patients</li>
+              <li>interaction_history</li>
+              <li>coach_chat_history</li>
+              <li>safety_escalations</li>
+            </ul>
+          </div>
+          <div class="box">
+            <div class="label">ChromaDB · Vector Store</div>
+            <div class="sub">RAG Retrieval</div>
+            <ul class="items">
+              <li>dementia_guidelines collection</li>
+              <li>20 clinical guideline docs</li>
+            </ul>
+          </div>
+          <div class="box">
+            <div class="label">Vertex AI Search</div>
+            <ul class="items">
+              <li>dementia-care-guidelines datastore</li>
+              <li>dementia-care-patients datastore</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Security -->
+      <div class="group" style="min-width:180px;">
+        <div class="group-label">Security &amp; IAM</div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div class="box">
+            <div class="label">Secret Manager</div>
+            <ul class="items">
+              <li>gemini-api-key</li>
+              <li>user-api-key</li>
+              <li>admin-api-key</li>
+              <li>db-password</li>
+            </ul>
+          </div>
+          <div class="box">
+            <div class="label">IAM</div>
+            <div class="sub">App Service Account</div>
+            <ul class="items">
+              <li>secretAccessor</li>
+              <li>Cloud SQL client</li>
+              <li>Vertex AI user</li>
+            </ul>
+          </div>
+          <div class="box dashed">
+            <div class="label">Container Registry</div>
+            <div class="sub">GCR</div>
+            <ul class="items">
+              <li>frontend:latest</li>
+              <li>backend:latest</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Observability -->
+      <div class="group" style="min-width:200px;">
+        <div class="group-label">Observability</div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div class="box">
+            <div class="label">Cloud Logging</div>
+            <ul class="items">
+              <li>GenAI Log Sink → BQ</li>
+              <li>Feedback Log Sink → BQ</li>
+            </ul>
+          </div>
+          <div class="box">
+            <div class="label">GCS Bucket</div>
+            <div class="sub">OTel Telemetry Logs</div>
+            <ul class="items">
+              <li>completions/ (JSON spans)</li>
+            </ul>
+          </div>
+          <div class="box">
+            <div class="label">BigQuery · Telemetry Dataset</div>
+            <ul class="items">
+              <li>genai_logs_table</li>
+              <li>completions (ext table)</li>
+              <li>completions_view (JOIN)</li>
+            </ul>
+          </div>
+          <div class="box dashed">
+            <div class="label">Vertex AI Reasoning Engine</div>
+            <div class="sub">ADK Runtime</div>
+            <ul class="items">
+              <li>1–10 instances</li>
+              <li>google-adk framework</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end row 4 -->
+
+  </div><!-- end GCP cloud -->
+
+</div><!-- end canvas -->
+
+</body>
+</html>

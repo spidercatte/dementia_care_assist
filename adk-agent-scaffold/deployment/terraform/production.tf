@@ -215,6 +215,26 @@ resource "google_cloud_run_v2_service" "backend_service" {
         value = google_sql_database.dementia_care_db.name
       }
 
+      env {
+        name  = "VERTEX_SEARCH_PROJECT_ID"
+        value = var.prod_project_id
+      }
+
+      env {
+        name  = "VERTEX_SEARCH_LOCATION"
+        value = "global"
+      }
+
+      env {
+        name  = "VERTEX_SEARCH_DATASTORE_ID"
+        value = "dementia-care-guidelines"
+      }
+
+      env {
+        name  = "VERTEX_PATIENT_DATASTORE_ID"
+        value = "dementia-care-patients"
+      }
+
       # Cloud SQL Auth Proxy sidecar connection configuration
       volume_mounts {
         name       = "cloudsql"

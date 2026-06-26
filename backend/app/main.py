@@ -128,15 +128,37 @@ DEFAULT_PROFILE = {
     "fall_risk": "Medium",
     "mobility_aids": ["walker"],
     "diet_texture": "Soft",
-    "sensory_aids": ["glasses"]
+    "sensory_aids": ["glasses"],
+    "care_notes": (
+        "Maria responds well to validation therapy and redirection to familiar memories. She becomes "
+        "distressed when corrected or when her sense of routine is disrupted. Approach her with a calm, "
+        "unhurried tone. Music from the 1950s is particularly effective for de-escalation during "
+        "sundowning episodes. Her diabetes management requires monitoring intake during agitated episodes "
+        "when she may refuse food."
+    ),
 }
 
 ARTHUR_PROFILE = {
     "name": "Arthur",
     "dementia_type": "Lewy Body Dementia (Moderate Stage)",
-    "triggers": ["hallucinations", "being corrected about visions", "sudden movements", "complex task demands"],
-    "preferences": ["watching classic movies", "eating soft butterscotch candy", "holding a warm cup of coffee"],
-    "background": "Arthur is 82 years old. He has Lewy Body dementia and experiences vivid visual hallucinations (often seeing children or small animals in the room). He gets highly anxious when others tell him these are not real. He is prone to motor fluctuations and stiffness, especially during transitions.",
+    "triggers": [
+        "Visual hallucinations being denied or dismissed",
+        "Being corrected about visions he sees",
+        "Sudden movements in his peripheral vision",
+        "Complex task demands during motor-off periods",
+    ],
+    "preferences": [
+        "watching classic movies",
+        "eating soft butterscotch candy",
+        "holding a warm cup of coffee",
+        "Discussing engineering or machinery topics",
+    ],
+    "background": (
+        "Arthur is 82 years old. He has Lewy Body dementia and experiences vivid visual hallucinations "
+        "(often seeing children or small animals in the room). He gets highly anxious when others tell him "
+        "these are not real. He is prone to motor fluctuations and stiffness, especially during transitions. "
+        "He was a retired engineer who takes pride in his problem-solving abilities."
+    ),
     "medications": [
         {"name": "Rivastigmine (Exelon)", "purpose": "memory / cognition"},
         {"name": "Carbidopa-Levodopa", "purpose": "Parkinson's-like motor symptoms"},
@@ -147,7 +169,15 @@ ARTHUR_PROFILE = {
     "fall_risk": "High",
     "mobility_aids": ["cane", "grab bars"],
     "diet_texture": "Regular",
-    "sensory_aids": ["hearing aids", "glasses"]
+    "sensory_aids": ["hearing aids", "glasses"],
+    "care_notes": (
+        "Never dismiss or argue about Arthur's hallucinations — acknowledge them with calm reassurance "
+        "('I don't see them, but I understand they look real to you'). Approach him slowly and announce "
+        "your presence before touching. Schedule personal care tasks during motor-on periods (typically "
+        "mid-morning). His atrial fibrillation increases fall risk during dizziness episodes; ensure grab "
+        "bars are within reach at all times. Classic films from the 1940s-1960s provide reliable comfort "
+        "and distraction."
+    ),
 }
 
 def init_db():
@@ -165,14 +195,16 @@ def init_db():
             fall_risk TEXT,
             mobility_aids TEXT,
             diet_texture TEXT,
-            sensory_aids TEXT
+            sensory_aids TEXT,
+            care_notes TEXT
         )
     """)
     # Migrate existing tables that predate the new health columns
     for col, default in [
         ("medications", "[]"), ("conditions", "[]"), ("allergies", "[]"),
         ("fall_risk", "Low"), ("mobility_aids", "[]"),
-        ("diet_texture", "Regular"), ("sensory_aids", "[]")
+        ("diet_texture", "Regular"), ("sensory_aids", "[]"),
+        ("care_notes", ""),
     ]:
         try:
             db_client.execute(f"ALTER TABLE patients ADD COLUMN {col} TEXT DEFAULT '{default}'")
@@ -225,8 +257,8 @@ def init_db():
                 pass
         db_client.execute("""
             INSERT INTO patients (name, dementia_type, triggers, preferences, background,
-                medications, conditions, allergies, fall_risk, mobility_aids, diet_texture, sensory_aids)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                medications, conditions, allergies, fall_risk, mobility_aids, diet_texture, sensory_aids, care_notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             maria_profile["name"], maria_profile["dementia_type"],
             json.dumps(maria_profile["triggers"]), json.dumps(maria_profile["preferences"]),
@@ -237,7 +269,8 @@ def init_db():
             maria_profile.get("fall_risk", "Low"),
             json.dumps(maria_profile.get("mobility_aids", [])),
             maria_profile.get("diet_texture", "Regular"),
-            json.dumps(maria_profile.get("sensory_aids", []))
+            json.dumps(maria_profile.get("sensory_aids", [])),
+            maria_profile.get("care_notes", ""),
         ))
 
     # Seed Arthur
@@ -245,8 +278,8 @@ def init_db():
     if row and list(row.values())[0] == 0:
         db_client.execute("""
             INSERT INTO patients (name, dementia_type, triggers, preferences, background,
-                medications, conditions, allergies, fall_risk, mobility_aids, diet_texture, sensory_aids)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                medications, conditions, allergies, fall_risk, mobility_aids, diet_texture, sensory_aids, care_notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             ARTHUR_PROFILE["name"], ARTHUR_PROFILE["dementia_type"],
             json.dumps(ARTHUR_PROFILE["triggers"]), json.dumps(ARTHUR_PROFILE["preferences"]),
@@ -257,8 +290,36 @@ def init_db():
             ARTHUR_PROFILE.get("fall_risk", "Low"),
             json.dumps(ARTHUR_PROFILE.get("mobility_aids", [])),
             ARTHUR_PROFILE.get("diet_texture", "Regular"),
-            json.dumps(ARTHUR_PROFILE.get("sensory_aids", []))
+            json.dumps(ARTHUR_PROFILE.get("sensory_aids", [])),
+            ARTHUR_PROFILE.get("care_notes", ""),
         ))
+
+    # Backfill care_notes for existing rows that predate the field
+    for profile in [DEFAULT_PROFILE, ARTHUR_PROFILE]:
+        care_notes = profile.get("care_notes", "")
+        if care_notes:
+            try:
+                db_client.execute(
+                    "UPDATE patients SET care_notes = ? WHERE name = ? AND (care_notes IS NULL OR care_notes = '')",
+                    (care_notes, profile["name"])
+                )
+            except Exception:
+                pass
+
+    # Backfill updated fields (triggers, preferences, background) for existing rows
+    for profile in [DEFAULT_PROFILE, ARTHUR_PROFILE]:
+        try:
+            db_client.execute(
+                "UPDATE patients SET triggers = ?, preferences = ?, background = ? WHERE name = ?",
+                (
+                    json.dumps(profile["triggers"]),
+                    json.dumps(profile["preferences"]),
+                    profile["background"],
+                    profile["name"],
+                )
+            )
+        except Exception:
+            pass
 
 # Run database initialization
 init_db()
@@ -322,20 +383,21 @@ def save_patient_profile(profile: dict):
             json.dumps(profile.get("mobility_aids", [])),
             profile.get("diet_texture", "Regular"),
             json.dumps(profile.get("sensory_aids", [])),
+            profile.get("care_notes", ""),
         )
         if row:
             db_client.execute("""
                 UPDATE patients
                 SET dementia_type = ?, triggers = ?, preferences = ?, background = ?,
                     medications = ?, conditions = ?, allergies = ?, fall_risk = ?,
-                    mobility_aids = ?, diet_texture = ?, sensory_aids = ?
+                    mobility_aids = ?, diet_texture = ?, sensory_aids = ?, care_notes = ?
                 WHERE id = ?
             """, params + (list(row.values())[0],))
         else:
             db_client.execute("""
                 INSERT INTO patients (name, dementia_type, triggers, preferences, background,
-                    medications, conditions, allergies, fall_risk, mobility_aids, diet_texture, sensory_aids)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    medications, conditions, allergies, fall_risk, mobility_aids, diet_texture, sensory_aids, care_notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (profile.get("name"),) + params)
     except Exception as e:
         print(f"Error saving patient profile: {e}")

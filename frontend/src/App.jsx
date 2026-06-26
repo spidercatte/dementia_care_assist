@@ -640,6 +640,23 @@ function App() {
   // ----------------------------------------------------
   // Ingestion & 5-Agent Analysis Actions
   // ----------------------------------------------------
+  const handleNewSession = () => {
+    cleanupRecording();
+    setShowRecorder(false);
+    setInputText('');
+    setSelectedFile(null);
+    if (fileUrl) URL.revokeObjectURL(fileUrl);
+    setFileUrl(null);
+    setAnalysisResult(null);
+    setAnalysisSourceType(null);
+    setAnalysisStep(0);
+    setTranslationLanguage('original');
+    setTranslatedResult(null);
+    setCoachChatHistory([]);
+    setCoachInputText('');
+    setSuggestedUpdates(null);
+  };
+
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -1426,10 +1443,22 @@ function App() {
           <div className="dashboard-grid split">
             {/* Left Column: Upload / Log Input */}
             <div className="glass-card">
-              <h2 className="card-title">
-                <Upload size={20} className="logo-icon" />
-                Record Interaction
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <h2 className="card-title" style={{ margin: 0 }}>
+                  <Upload size={20} className="logo-icon" />
+                  Record Interaction
+                </h2>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleNewSession}
+                  title="Clear all inputs and results to start fresh"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+                >
+                  <RefreshCw size={13} />
+                  New Session
+                </button>
+              </div>
 
               <div className="form-group">
                 <label className="form-label">Option A: Record or Upload Interaction</label>
