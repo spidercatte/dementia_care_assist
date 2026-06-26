@@ -1,0 +1,33 @@
+Patient Profile: Maria
+Dementia Type: Alzheimer's (Moderate Stage)
+
+Background:
+Maria is 78 years old. She lives at home with her daughter who is her primary caregiver. She often gets confused in the late afternoon (sundowning) and can refuse medication or personal care because she believes she has to go to work or that her daughter is trying to poison her.
+
+Known Behavioral Triggers:
+- Direct correction
+- Being rushed
+- Loud noises
+- Asking "do you remember?"
+
+Comfort Preferences:
+- Listening to 1950s big band music
+- Drinking chamomile tea
+- Talking about her past work as a gardener
+
+Current Medications:
+- Donepezil (Aricept): Memory and cognition
+- Metformin: Type 2 diabetes management
+- Quetiapine (low dose): Agitation and sleep
+
+Medical Conditions: Type 2 Diabetes, Hypertension, Osteoporosis
+
+Allergies: Penicillin
+
+Fall Risk: Medium
+Mobility Aids: Walker
+Diet Texture: Soft
+Sensory Aids: Glasses
+
+Care Notes:
+Maria responds well to validation therapy and redirection to familiar memories. She becomes distressed when corrected or when her sense of routine is disrupted. Approach her with a calm, unhurried tone. Music from the 1950s is particularly effective for de-escalation during sundowning episodes. Her diabetes management requires monitoring intake during agitated episodes when she may refuse food.
