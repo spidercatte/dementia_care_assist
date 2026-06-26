@@ -1,144 +1,271 @@
-# DementiaCare Coach 🧠❤️
-**An AI-Powered Caregiver Co-Pilot utilizing a Modular 6-Agent Collaborative Pipeline**
+# DementiaCare Coach
+**An AI-Powered Caregiver Co-Pilot | Kaggle AI Agents Capstone — Agents for Good**
 
-DementiaCare Coach is an intelligent assistant designed to help family and clinical dementia caregivers manage difficult behaviors (agitation, confusion, refusal, wandering, emotional distress) using evidence-based practices (Validation Therapy, Habilitation, Teepa Snow's Positive Approach to Care).
+DementiaCare Coach helps family and clinical caregivers manage difficult dementia patient behaviors — agitation, confusion, medication refusal, wandering, and emotional distress — using evidence-based practices including Validation Therapy, Habilitation, and Teepa Snow's Positive Approach to Care.
 
-This project was built for the **AI Agents: Intensive Vibe Coding Capstone Project** competition.
-
----
-
-## Project Overview
-
-### Problem
-Dementia caregivers often face aggressive behaviors, confusion, wandering, and emotional distress. Most family caregivers receive little training and struggle to respond effectively in difficult situations.
-
-### Solution
-DementiaCare Coach is an AI agent that analyzes caregiver-patient interactions through video, audio, and patient history. The system provides personalized coaching recommendations grounded in dementia care best practices.
-
-### Key Features (Product Goals)
-* 📹 **Video interaction analysis**
-* 🎭 **Emotion and behavior recognition**
-* 💡 **Personalized coaching suggestions**
-* 🧠 **Patient context awareness**
-* 🏥 **Medical condition integration**
-* 🤝 **Trauma-informed care guidance**
-* 📊 **Caregiver education and feedback**
-
-### How It Works
-1. **Caregiver records an interaction.**
-2. **AI analyzes verbal and non-verbal signals.**
-3. **Patient profile is retrieved.**
-4. **Agent reasons over:**
-   * Dementia care guidelines
-   * Occupational therapy practices
-   * Nursing protocols
-   * Patient history
-5. **Personalized recommendations are generated.**
-
-### Example Scenario
-If a patient becomes agitated when reminded to take medication, the agent may identify that direct correction is escalating distress and suggest validation therapy techniques instead.
-
-### Impact
-The system helps caregivers reduce stress, improve communication, and potentially delay institutionalization while improving quality of life for dementia patients.
+> Built for the [AI Agents: Intensive Vibe Coding Capstone Project](https://www.kaggle.com/competitions/vibecoding-agents-capstone-project) on Kaggle.
 
 ---
 
-## Key Features
+## The Problem
 
-1. **Explicit 6-Agent Modular Architecture:**
-   The backend splits the reasoning process across six specialized agents, coordinated by a central orchestrator:
-   * 🎮 **Orchestrator Agent (`orchestrator.py`):** Acts as the pipeline controller. Coordinates state, handles inputs, invokes RAG, and manages the API fallback.
-   * 🔍 **Interaction Analysis Agent (`interaction_analysis.py`):** Extracts observed behaviors, verbal/non-verbal cues, caregiver style, and agitation levels (1-10) from logs.
-   * 📋 **Patient Context Agent (`patient_context.py`):** Examines history and staging to flag health risk factors and patient-specific triggers.
-   * 📚 **Care Guidance Agent (`care_guidance.py`):** Queries guidelines and provides clinical recommendations.
-   * ⚠️ **Safety & Escalation Agent (`safety_escalation.py`):** Audits safety hazards (falls, wandering, medication omissions, UTI signs).
-   * 🎓 **Caregiver Coaching Agent (`caregiver_coaching.py`):** Converts clinical findings into compassionate step-by-step coaching scripts ("Try saying..." vs "Avoid saying...").
+Over 55 million people worldwide live with dementia. The majority are cared for at home by family members who receive little to no professional training. When a patient becomes agitated, refuses medication, or exhibits distressing behaviors, caregivers often respond intuitively — and frequently make the situation worse by correcting the patient's reality, arguing, or rushing them.
 
-2. **Interactive Care Simulator (Maria):**
-   A training sandbox where caregivers can text with a simulated patient (Maria). Maria's agitation level updates dynamically based on the caregiver's response patterns. Includes live coaching tips.
+The result: escalating distress for the patient, caregiver burnout, and unnecessary institutionalization.
 
-3. **Externalized Guidelines & RAG Library:**
-   Care guidelines are stored in `backend/data/dementia_care_guidelines.md`. The RAG pipeline parses, embeds, and indexes these guidelines directly into ChromaDB.
-
-4. **API-Resilient Mock Mode:**
-   If the Gemini API key is missing or calls fail, the backend seamlessly falls back to local high-fidelity mock responses for typical scenarios (medication refusal, shower resistance, wants to go home), protecting the demonstration.
+**There is no always-available, personalized coach standing beside a caregiver at 2am when their loved one is having a crisis.**
 
 ---
 
-## Directory Structure
+## The Solution
+
+DementiaCare Coach is a multi-modal AI agent that:
+
+1. **Analyzes caregiver-patient interactions** — via uploaded video, audio, or written description
+2. **Retrieves evidence-based clinical guidelines** from a RAG-indexed vector store
+3. **Generates personalized coaching** — what the caregiver did well, what to change, and exact dialog scripts ("Try saying..." / "Avoid saying...")
+4. **Flags safety hazards** — fall risk, medication omission, delirium signs — and persists them for clinician review
+5. **Simulates patient interactions** — a training sandbox where caregivers practice before real situations
+
+---
+
+## Key Course Concepts Demonstrated
+
+| Concept | Where |
+|---|---|
+| **Multi-agent system (ADK)** | `adk-agent-scaffold/app/agent.py` — ADK conversational coach; `backend/app/agents/` — 6-agent pipeline |
+| **MCP Server** | `backend/app/mcp_server.py` — FastMCP over SSE, consumed by the ADK agent |
+| **Security features** | `backend/app/main.py` — API key auth (`X-API-Key`), rate limiting (60 req/min/IP), CORS |
+| **Deployability** | `docker-compose.yaml` — 4-service stack (PostgreSQL, ChromaDB, FastAPI backend, React frontend) |
+| **Antigravity** | See video demo |
+| **RAG** | `backend/app/rag.py` — ChromaDB + Gemini `text-embedding-004`; `backend/data/rag/guidelines/` |
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        React Frontend                           │
+│   (Analysis tab | Simulator tab | Coach chat | RAG viewer)      │
+└──────────────────────┬──────────────────────────────────────────┘
+                       │ REST (VITE_BACKEND_URL)
+┌──────────────────────▼──────────────────────────────────────────┐
+│                    FastAPI Backend                               │
+│                                                                 │
+│   /analyze/text   /analyze/file   /simulator/step   /coach/chat │
+│         │                │                │               │     │
+│  ┌──────▼────────────────▼──────┐   ┌─────▼───────────────▼──┐ │
+│  │   OrchestratorAgent          │   │  SimulatorAgent /       │ │
+│  │   6-Step Sequential Pipeline │   │  ConversationalCoach    │ │
+│  │                              │   └────────────────────────┘ │
+│  │  Step 0: ValidationService   │                              │
+│  │  Step 1: InteractionAnalyzer │◄── Gemini File API           │
+│  │  Step 2: PatientContext      │    (video/audio upload)      │
+│  │     RAG: ChromaDB query ─────┼──► ChromaDB (guidelines)     │
+│  │  Step 3: CareGuidanceService │                              │
+│  │  Step 4: SafetyEvaluator     │                              │
+│  │  Step 5: CoachingSynthesizer │                              │
+│  └──────────────────────────────┘                              │
+│                                                                 │
+│   /mcp/sse  ◄─── FastMCP Server (MCP over SSE)                  │
+│                  tools: get_patient_profile                     │
+│                          log_safety_escalation (→ DB)          │
+│                          query_care_guidelines (→ ChromaDB)    │
+└───────────────────────┬─────────────────────────────────────────┘
+                        │ MCP SSE
+┌───────────────────────▼─────────────────────────────────────────┐
+│              ADK Agent Scaffold (adk-agent-scaffold/)           │
+│   google.adk.agents.Agent — conversational dementia coach       │
+│   Tools: get_patient_profile | log_safety_escalation |          │
+│           query_care_guidelines                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### The 6-Agent Pipeline (detail)
+
+Each step is a dedicated Gemini agent with a narrow system prompt and an enforced Pydantic output schema (`response_mime_type="application/json"`). Splitting across agents reduces hallucination: each agent is primed only with context relevant to its task, and failures are diagnosable per step.
+
+| Step | Agent | Output Schema | Purpose |
+|---|---|---|---|
+| 0 | `ValidationService` | `ValidationResponse` | Reject noise (silence, unrelated media, greetings) before spending tokens |
+| 1 | `InteractionAnalyzer` | `InteractionAnalysisResponse` | Extract behavior, agitation level, behavioral timeline, RAG query keyword |
+| 2 | `PatientContextProcessor` | `PatientContextResponse` | Map patient history & known triggers against what was observed |
+| RAG | ChromaDB | — | Retrieve top-2 clinical guidelines matching Step 1's `rag_query` |
+| 3 | `CareGuidanceService` | `CareGuidanceResponse` | Synthesize RAG results into clinical recommendations & do-not lists |
+| 4 | `SafetyEvaluator` | `SafetyEscalationResponse` | Dedicated safety pass — never buried in coaching output |
+| 5 | `CoachingSynthesizer` | `FinalCoachingResponse` | Assemble full coaching response with scripts, strengths, recommendations |
+
+---
+
+## Features
+
+- **Multi-modal input** — video, audio, or text description of a care interaction
+- **Behavioral timeline** — chronological breakdown of patient behavior with clinical symptom labels
+- **Coaching scripts** — exact "Try saying / Avoid saying" dialog pairs
+- **Interactive simulator** — roleplay as a caregiver with a simulated patient (Maria / Arthur); agitation level updates dynamically
+- **Conversational coach** — follow-up chat powered by the ADK agent via MCP
+- **Multi-language support** — detects interaction language; translate coaching to caregiver's native language
+- **Safety escalation** — HIGH/EMERGENCY alerts persisted to database for clinician review
+- **RAG-grounded guidance** — recommendations cite indexed clinical protocols
+- **Mock mode** — full demo without an API key (high-fidelity local responses)
+
+---
+
+## Setup
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+
+- A [Google Gemini API key](https://aistudio.google.com/app/apikey)
+
+### Option A: Local Development (no Docker)
+
+**1. Backend**
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+cp .env.example .env
+# Edit .env and set:
+#   GEMINI_API_KEY=your_key_here
+#   (Leave blank to run in MOCK mode — full demo still works)
+
+uvicorn app.main:app --reload --port 8000
+```
+
+Backend runs at `http://localhost:8000`. Swagger docs at `http://localhost:8000/docs`.
+
+**2. Frontend**
+
+```bash
+cd frontend
+npm install
+cp .env.example .env.local
+# Edit .env.local:
+#   VITE_BACKEND_URL=http://localhost:8000
+
+npm run dev
+```
+
+Frontend runs at `http://localhost:5173`.
+
+**3. Seed the RAG database**
+
+On first run, click **"Seed RAG DB"** in the app header (or call `POST /guidelines/seed` with your admin API key). This embeds the clinical guidelines from `backend/data/rag/guidelines/` into ChromaDB.
+
+---
+
+### Option B: Docker Compose (full production-like stack)
+
+```bash
+# From the repo root
+cp backend/.env.example backend/.env
+# Edit backend/.env and set GEMINI_API_KEY
+
+docker-compose up --build
+```
+
+This starts:
+- `db` — PostgreSQL 15 (patient data, safety escalation logs)
+- `rag` — ChromaDB 0.4.24 (clinical guidelines vector store)
+- `backend` — FastAPI + FastMCP server
+- `frontend` — React app served via Nginx on port 80
+
+Access the app at `http://localhost`.
+
+---
+
+### Option C: ADK Agent Scaffold (conversational agent)
+
+The ADK agent connects to the backend via MCP over SSE for conversational caregiver coaching.
+
+```bash
+cd adk-agent-scaffold
+pip install -r requirements.txt   # or: uv sync
+
+export BACKEND_URL=http://localhost:8000
+# For Vertex AI:
+export GOOGLE_GENAI_USE_VERTEXAI=True
+export GOOGLE_CLOUD_PROJECT=your-project-id
+
+adk run app
+```
+
+---
+
+## Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `GEMINI_API_KEY` | For live mode | Google Gemini API key |
+| `ADMIN_API_KEY` | Optional | API key for admin endpoints (seeding, etc.) |
+| `USER_API_KEY` | Optional | API key for caregiver-facing endpoints |
+| `DATABASE_URL` | Docker only | PostgreSQL connection string |
+| `CHROMA_SERVER_HOST` | Docker only | ChromaDB host (default: local PersistentClient) |
+| `CHROMA_SERVER_PORT` | Docker only | ChromaDB port |
+
+Leave `GEMINI_API_KEY` blank to run in **MOCK mode** — the app returns high-fidelity local responses for the three most common dementia scenarios (medication refusal, shower resistance, wanting to go home).
+
+---
+
+## Project Structure
 
 ```
 dementia_care/
 ├── backend/
 │   ├── app/
 │   │   ├── agents/
-│   │   │   ├── orchestrator.py
-│   │   │   ├── interaction_analysis.py
-│   │   │   ├── patient_context.py
-│   │   │   ├── care_guidance.py
-│   │   │   ├── safety_escalation.py
-│   │   │   ├── caregiver_coaching.py
-│   │   │   └── simulator.py
-│   │   ├── main.py               # FastAPI routes
-│   │   ├── rag.py                # ChromaDB vector indexer
-│   │   ├── schemas.py            # Pydantic schemas
-│   │   ├── mock_responses.py     # Local mock data provider
-│   │   └── config.py
+│   │   │   ├── orchestrator.py          # Pipeline controller
+│   │   │   ├── validation.py            # Step 0: intake gatekeeper
+│   │   │   ├── interaction_analysis.py  # Step 1: behavioral signals
+│   │   │   ├── patient_context.py       # Step 2: patient history mapping
+│   │   │   ├── care_guidance.py         # Step 3: RAG-grounded advice
+│   │   │   ├── safety_escalation.py     # Step 4: safety audit
+│   │   │   ├── caregiver_coaching.py    # Step 5: final coaching output
+│   │   │   ├── simulator.py             # Interactive training simulator
+│   │   │   └── conversational_coach.py  # Follow-up chat agent
+│   │   ├── main.py                      # FastAPI routes + auth + rate limiting
+│   │   ├── mcp_server.py                # FastMCP tools (MCP over SSE)
+│   │   ├── rag.py                       # ChromaDB + Gemini embeddings
+│   │   ├── schemas.py                   # Pydantic output schemas (all agents)
+│   │   ├── database.py                  # SQLite / PostgreSQL client
+│   │   └── config.py                    # Pydantic settings
 │   ├── data/
-│   │   └── dementia_care_guidelines.md   # Externalized guidelines
+│   │   └── rag/guidelines/              # Clinical protocol markdown files
+│   ├── tests/                           # Per-agent eval tests + API tests
 │   └── requirements.txt
 ├── frontend/
-│   └── ...
-└── README.md
+│   └── src/
+│       └── App.jsx                      # React SPA
+├── adk-agent-scaffold/
+│   └── app/
+│       └── agent.py                     # ADK agent + MCP tool wrappers
+├── docker-compose.yaml
+└── threat_model.md
 ```
 
 ---
 
-## Setup & Running Instructions
+## Security
 
-### 1. Configure Backend Environment
-First, navigate to the `backend` directory, create a `.env` file, and enter your Google Gemini API key:
-```bash
-cd backend
-cp .env.example .env
-# Open .env and set:
-# GEMINI_API_KEY=your_actual_api_key (Leave blank to run in MOCK mode!)
-```
+- **API key authentication** — `X-API-Key` header required on all caregiver and admin endpoints
+- **Role separation** — separate `USER_API_KEY` and `ADMIN_API_KEY` (admin required for seeding/maintenance)
+- **Rate limiting** — 60 requests/minute per IP address
+- **CORS** — explicit allowlist of frontend origins
+- **No secrets in code** — all keys via environment variables / `.env` files (never committed)
+- **Safety audit trail** — escalations written to the database for clinician review
 
-#### Start the Backend Server:
-Activate the virtual environment and start the FastAPI uvicorn server:
-```bash
-source venv/bin/activate
-uvicorn app.main:app --reload --port 8000
-```
-*The backend API will run on `http://localhost:8000`. You can view the swagger docs at `http://localhost:8000/docs`.*
+See [`threat_model.md`](./threat_model.md) for the full security threat model.
 
 ---
-
-### 2. Configure & Run Frontend
-In a new terminal window, navigate to the `frontend` directory:
-```bash
-cd frontend
-npm install
-npm run dev
-```
-*The frontend web app will open at `http://localhost:5173`.*
-
----
-
-### 3. Seed the Guidelines Database (RAG)
-When running the app for the first time, click the **"Seed RAG DB"** button in the header of the app to read `dementia_care_guidelines.md` and seed the local vector store.
-
----
-
-## Future Work
-* ⚡ **Real-time coaching**
-* ⌚ **Wearable integration**
-* 🏥 **EHR (Electronic Health Record) integration**
-* 🔮 **Predictive behavior forecasting**
-* 🎓 **Caregiver training simulations**
 
 ## Contributors
-* Catherine Balajadia
-* Adrian Balajadia
-* Avan Sargento
+
+- Catherine Balajadia
+- Adrian Balajadia
+- Avan Sargento

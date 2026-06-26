@@ -82,6 +82,10 @@ class FinalCoachingResponse(BaseModel):
     recommendations: List[Recommendation] = Field(description="List of detailed recommendation cards")
     detected_language: str = Field(description="The language detected in the input interaction, e.g., 'English', 'Tagalog', 'Spanish', etc.")
 
+    # Dynamic Profile Enrichment Suggestions
+    suggested_triggers: Optional[List[str]] = Field(default=None, description="Suggested new triggers to add to the patient profile")
+    suggested_preferences: Optional[List[str]] = Field(default=None, description="Suggested new preferences to add to the patient profile")
+
 # ==========================================
 # 6. Translation Request Schema
 # ==========================================
@@ -96,3 +100,10 @@ class ValidationResponse(BaseModel):
     is_valid: bool = Field(description="True if the input contains a valid caregiver-patient interaction related to dementia care, False otherwise.")
     summary: Optional[str] = Field(None, description="A 1-sentence summary of the interaction if valid, or null if invalid.")
     reason: Optional[str] = Field(None, description="A clear rejection reason if invalid, or null if valid.")
+
+# ==========================================
+# 8. Profile Enrichment Schema
+# ==========================================
+class ProfileEnricherResponse(BaseModel):
+    new_triggers: List[str] = Field(default=[], description="New potential triggers discovered in the dialogue")
+    new_preferences: List[str] = Field(default=[], description="New potential comfort habits, routines, or items discovered")

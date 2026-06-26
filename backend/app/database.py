@@ -55,6 +55,7 @@ class DatabaseClient:
                 hostname = self.db_host
                 port = self.db_port
 
+            assert psycopg2 is not None
             return psycopg2.connect(
                 database=database,
                 user=username,
@@ -100,6 +101,8 @@ class DatabaseClient:
                 return None
 
             if self.is_postgres:
+                if cursor.description is None:
+                    return None
                 columns = [desc[0] for desc in cursor.description]
                 return dict(zip(columns, row))
             else:
@@ -116,6 +119,8 @@ class DatabaseClient:
             rows = cursor.fetchall()
 
             if self.is_postgres:
+                if cursor.description is None:
+                    return []
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in rows]
             else:

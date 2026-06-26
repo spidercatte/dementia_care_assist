@@ -1,6 +1,7 @@
 import logging
 import chromadb
 from chromadb import EmbeddingFunction, Documents, Embeddings
+from typing import cast
 from google import genai
 from google.genai import errors
 from app.config import settings
@@ -24,7 +25,7 @@ class GeminiEmbeddingFunction(EmbeddingFunction):
                 self.client = genai.Client(api_key=settings.gemini_api_key)
             else:
                 logger.warning("Gemini API Client is not initialized. Generating dummy mock embeddings.")
-                return [[0.0] * 768 for _ in texts]
+                return cast(Embeddings, [[0.0] * 768 for _ in texts])
 
         try:
             embeddings = []
@@ -33,8 +34,11 @@ class GeminiEmbeddingFunction(EmbeddingFunction):
                     model="text-embedding-004",
                     contents=text
                 )
-                embeddings.append(response.embeddings[0].values)
-            return embeddings
+                if response.embeddings and len(response.embeddings) > 0 and response.embeddings[0].values:
+                    embeddings.append(response.embeddings[0].values)
+                else:
+                    embeddings.append([0.0] * 768)
+            return cast(Embeddings, embeddings)
         except Exception as e:
             logger.warning(f"Failed to generate embeddings via Gemini API: {e}. Falling back to deterministic mock embeddings.")
             embeddings = []
@@ -46,7 +50,7 @@ class GeminiEmbeddingFunction(EmbeddingFunction):
                     val = (h[i % len(h)] + i) % 256
                     vector.append((val / 255.0) - 0.5)
                 embeddings.append(vector)
-            return embeddings
+            return cast(Embeddings, embeddings)
 
 def get_chroma_client():
     if settings.chroma_server_host:
@@ -82,14 +86,21 @@ def query_guidelines(query_text: str, n_results: int = 3):
         )
         # Parse into a friendly list of dicts
         parsed_results = []
-        if results and results["documents"] and len(results["documents"][0]) > 0:
-            for i in range(len(results["documents"][0])):
-                parsed_results.append({
-                    "id": results["ids"][0][i],
-                    "document": results["documents"][0][i],
-                    "metadata": results["metadatas"][0][i],
-                    "distance": results["distances"][0][i] if "distances" in results and results["distances"] else None
-                })
+        if results and results.get("documents") is not None:
+            documents = results.get("documents")
+            assert documents is not None
+            if len(documents) > 0 and documents[0] is not None and len(documents[0]) > 0:
+                doc_list = documents[0]
+                metadatas = results.get("metadatas")
+                ids = results.get("ids")
+                distances = results.get("distances")
+                for i in range(len(doc_list)):
+                    parsed_results.append({
+                        "id": ids[0][i] if ids and len(ids) > 0 and ids[0] is not None and len(ids[0]) > i else f"doc_{i}",
+                        "document": doc_list[i],
+                        "metadata": metadatas[0][i] if metadatas and len(metadatas) > 0 and metadatas[0] is not None and len(metadatas[0]) > i else {},
+                        "distance": distances[0][i] if distances and len(distances) > 0 and distances[0] is not None and len(distances[0]) > i else None
+                    })
         return parsed_results
     except Exception as e:
         logger.error(f"Error querying guidelines: {e}")

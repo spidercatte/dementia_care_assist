@@ -11,12 +11,24 @@ from app.agents.conversational_coach import ConversationalCoachAgent
 
 client = TestClient(app)
 
-class MockGenerateContentResponse:
-    def __init__(self, text):
-        self.text = text
-
 def get_mock_llm_response(*args, **kwargs):
-    return MockGenerateContentResponse("Empathetic coaching advice response.")
+    return types.GenerateContentResponse(
+        candidates=[
+            types.Candidate(
+                content=types.Content(
+                    role="model",
+                    parts=[types.Part.from_text(text="Empathetic coaching advice response.")]
+                ),
+                finish_reason=types.FinishReason.STOP
+            )
+        ],
+        usage_metadata=types.UsageMetadata(
+            prompt_token_count=10,
+            candidates_token_count=10,
+            total_token_count=20
+        ),
+        model_version="gemini-2.5-flash"
+    )
 
 @pytest.fixture
 def gemini_client():
@@ -30,7 +42,14 @@ def gemini_client():
 
     mock_client = mock.MagicMock()
     mock_client.models.generate_content.side_effect = get_mock_llm_response
+
+    # Mock the async client for google-adk
+    async def mock_async_generate_content(*args, **kwargs):
+        return get_mock_llm_response(*args, **kwargs)
+
+    mock_client.aio.models.generate_content = mock_async_generate_content
     return mock_client
+
 
 def test_conversational_coach_agent_run(gemini_client):
     """

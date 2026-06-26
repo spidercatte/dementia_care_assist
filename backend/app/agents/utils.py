@@ -1,7 +1,9 @@
-def clean_json_text(text: str) -> str:
+from typing import Optional
+
+def clean_json_text(text: Optional[str]) -> str:
     """Extracts raw JSON content from text that might contain markdown blocks or conversational prefixes/suffixes."""
     if not text:
-        return text
+        return ""
     text = text.strip()
     start_idx = -1
     for i, char in enumerate(text):

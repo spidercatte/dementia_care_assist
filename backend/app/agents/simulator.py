@@ -26,7 +26,7 @@ class SimulatorAgent:
         """
         Simulates a step in an interactive caregiver roleplay session.
         """
-        if self.use_mock:
+        if self.use_mock or not self.client:
             # Simple mock response logic for testing
             return self._mock_step(scenario, chat_history)
 
@@ -36,16 +36,23 @@ class SimulatorAgent:
             role = "Caregiver" if msg["role"] == "user" else "Patient (Simulated)"
             formatted_chat += f"{role}: {msg['content']}\n"
 
+        dementia_name = patient_profile.get('name', 'Maria')
+        dementia_type = patient_profile.get('dementia_type', "Alzheimer's")
+        triggers_list = patient_profile.get('triggers', ['direct correction', 'arguments'])
+        triggers_str = ', '.join(triggers_list)
+        prefs_list = patient_profile.get('preferences', ['music', 'tea'])
+        prefs_str = ', '.join(prefs_list)
+
         prompt = (
             f"You are a training simulator for dementia caregivers. Your task is to play the role of a dementia patient in a training scenario.\n"
             f"You must react realistically based on the caregiver's responses. "
             f"If the caregiver is confrontational, uses direct correction, or argues, your agitation level should INCREASE. "
             f"If the caregiver uses validation therapy, keeps a calm tone, or redirects, your agitation level should DECREASE.\n\n"
             f"--- PATIENT PROFILE ---\n"
-            f"Name: {patient_profile.get('name', 'Maria')}\n"
-            f"Dementia Type: {patient_profile.get('dementia_type', 'Alzheimer\'s')}\n"
-            f"Key Triggers: {', '.join(patient_profile.get('triggers', ['direct correction', 'arguments']))}\n"
-            f"Preferences: {', '.join(patient_profile.get('preferences', ['music', 'tea']))}\n\n"
+            f"Name: {dementia_name}\n"
+            f"Dementia Type: {dementia_type}\n"
+            f"Key Triggers: {triggers_str}\n"
+            f"Preferences: {prefs_str}\n\n"
             f"--- SCENARIO ---\n"
             f"\"{scenario}\"\n\n"
             f"--- CONVERSATION HISTORY ---\n"

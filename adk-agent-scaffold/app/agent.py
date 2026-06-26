@@ -37,11 +37,21 @@ else:
 
 # ====================================================
 # ADK Agent Tools & FastMCP Client
+#
+# Architecture: The ADK agent does NOT contain business logic directly.
+# All data access and side effects are delegated to the FastAPI backend
+# via MCP (Model Context Protocol) over Server-Sent Events (SSE).
+# This keeps the agent stateless and the backend the single source of truth
+# for patient data, RAG guidelines, and safety audit logs.
 # ====================================================
 
 
 def call_mcp_tool(name: str, arguments: dict | None = None) -> str:
-    """Helper to synchronously execute an MCP tool on the remote backend server over SSE."""
+    """Helper to synchronously execute an MCP tool on the remote backend server over SSE.
+
+    The ADK runtime is async, but tool functions must be synchronous.
+    nest_asyncio patches the running event loop to allow asyncio.run() inside it.
+    """
     backend_url = os.environ.get("BACKEND_URL", "http://localhost:8000")
     if arguments is None:
         arguments = {}
@@ -81,19 +91,32 @@ def get_patient_profile() -> str:
 
 
 def log_safety_escalation(urgency_level: str, safety_reason: str) -> str:
-    """Logs a critical safety hazard or clinician escalation alert.
+    """Logs a critical safety hazard or clinician escalation alert, persisted to the database for clinician review.
 
     Args:
         urgency_level: One of 'LOW', 'MEDIUM', 'HIGH', or 'EMERGENCY'.
         safety_reason: The reason for the safety flag (e.g. fall hazard, medication refusal danger, delirium indicators).
 
     Returns:
-        A confirmation string stating that the safety alert was captured.
+        A confirmation string stating that the safety alert was captured and persisted.
     """
     return call_mcp_tool(
         "log_safety_escalation",
         {"urgency_level": urgency_level, "safety_reason": safety_reason},
     )
+
+
+def query_care_guidelines(behavior: str) -> str:
+    """Searches the clinical dementia care guidelines vector store (RAG) for evidence-based protocols matching the observed patient behavior.
+
+    Args:
+        behavior: A short description of the observed behavior or situation
+                  (e.g. 'medication refusal', 'shower resistance', 'sundowning agitation', 'wandering').
+
+    Returns:
+        A JSON string containing the top matching guidelines with titles and clinical text.
+    """
+    return call_mcp_tool("query_care_guidelines", {"behavior": behavior})
 
 
 # ====================================================
@@ -111,7 +134,7 @@ root_agent = Agent(
         "and evidence-based coaching to dementia caregivers.\n\n"
         "When a caregiver describes an interaction, always follow this protocol:\n"
         "1. Retrieve the patient's context using get_patient_profile() to check their stage and active triggers.\n"
-        "2. Query relevant care guidelines for the behaviors displayed (use your native RAG datastore tool).\n"
+        "2. Query relevant care guidelines for the behaviors displayed using query_care_guidelines() with a short behavior keyword.\n"
         "3. If there are safety hazards (e.g. falls, medication danger, severe pacing, wandering), log it using log_safety_escalation().\n"
         "4. Synthesize the findings and output caregiver feedback. Provide:\n"
         "   - An emotional behavioral analysis summary.\n"
@@ -121,7 +144,7 @@ root_agent = Agent(
         "   - Clear clinical guidelines and recommendations.\n\n"
         "Do not offer dry medical summaries; be highly actionable, supportive, and kind."
     ),
-    tools=[get_patient_profile, log_safety_escalation],
+    tools=[get_patient_profile, log_safety_escalation, query_care_guidelines],
 )
 
 app = App(

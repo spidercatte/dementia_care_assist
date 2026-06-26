@@ -1,5 +1,6 @@
 import logging
 import json
+from typing import Optional
 from google import genai
 from google.genai import errors
 
@@ -8,7 +9,10 @@ from app.schemas import FinalCoachingResponse, BehaviorRecognition, Recommendati
 from app.mock_responses import get_mock_coaching_response
 from app.rag import query_guidelines
 
-# Import specialized pipeline services
+# Each step is a dedicated agent with its own system prompt and Pydantic output schema.
+# Splitting across agents (rather than one mega-prompt) improves accuracy: each agent
+# is primed with only the context and instructions relevant to its narrow task, which
+# reduces hallucination and makes failures easier to diagnose per step.
 from app.agents.validation import ValidationService
 from app.agents.interaction_analysis import InteractionAnalyzer
 from app.agents.patient_context import PatientContextProcessor
@@ -19,21 +23,22 @@ from app.agents.caregiver_coaching import CoachingSynthesizer
 logger = logging.getLogger("dementiacare-orchestrator")
 
 def is_nonsensical_or_too_short(text: str) -> bool:
+    # Fast pre-filter before spending an API call on the ValidationService.
+    # Greetings and sub-15-char strings can never contain a valid care interaction.
     if not text:
         return True
     cleaned = text.strip().lower()
-    # Filter common short/greeting words
     greetings = {"hi", "hello", "hey", "test", "demo", "help", "please", "okay", "ok", "good morning", "good afternoon", "good evening", "goodbye", "bye", "yo", "sup"}
     if cleaned in greetings:
         return True
     if len(cleaned) < 15:
         return True
-    # If the text has no spaces (just a single long word/gibberish)
+    # Single unbroken strings are almost always gibberish or accidental pastes
     if " " not in cleaned and len(cleaned) > 0:
         return True
     return False
 
-def get_invalid_input_response(description: str, rejection_reason: str = None) -> FinalCoachingResponse:
+def get_invalid_input_response(description: str, rejection_reason: Optional[str] = None) -> FinalCoachingResponse:
     reason_prefix = f"Rejection Reason: {rejection_reason}\n\n" if rejection_reason else ""
     return FinalCoachingResponse(
         observed_behavior="Input Insufficient / Invalid",
@@ -104,8 +109,11 @@ class OrchestratorAgent:
                 self.use_mock = True
 
     def run_pipeline(self, contents: list, patient_profile: dict) -> FinalCoachingResponse:
-        """
-        Coordinates the execution of the 5 sub-agents in sequence.
+        """Coordinates the 6-agent pipeline in sequence.
+
+        contents may be a mix of strings and Gemini File API objects (video/audio).
+        Each step receives only the outputs it needs — no step sees the raw outputs
+        of unrelated steps — to keep prompts focused and reduce hallucination risk.
         """
         # Fall back to mock if flagged
         if self.use_mock:
@@ -117,7 +125,8 @@ class OrchestratorAgent:
             return get_mock_coaching_response(description_text or "Default Care Interaction Log")
 
         try:
-            # Step 0: Intake Validation Service
+            # Step 0: Intake Validation — rejects noise (silence, unrelated video, greetings)
+            # before spending tokens on the full pipeline.
             validation = self.validator.run(contents)
             logger.info(f"Step 0 (Intake Validation) Complete. Valid: {validation.is_valid}")
             if not validation.is_valid:
@@ -127,17 +136,21 @@ class OrchestratorAgent:
                         description_name = f"'{item}'"
                 return get_invalid_input_response(description_name, validation.reason)
 
-            # Step 1: Interaction Analysis (Analyzer)
-            # Pass the validation summary alongside original media to prime the analyzer
+            # Step 1: Interaction Analysis — extracts structured behavioral signals.
+            # The validation summary is appended as a soft primer so the analyzer
+            # doesn't need to re-watch/re-read the full content to orient itself.
             analysis_contents = contents + [f"Validation Intake Summary: {validation.summary}"]
             analysis = self.analyzer.run(analysis_contents)
             logger.info("Step 1 Complete.")
 
-            # Step 2: Patient Context Processor
+            # Step 2: Patient Context — maps the patient's history and known triggers
+            # against what was observed. Runs independently of Step 1's output,
+            # so these two could be parallelized in a future async refactor.
             context = self.context_expert.run(patient_profile)
             logger.info("Step 2 Complete.")
 
-            # Step RAG Ingestion: Search local vector DB using the generated RAG query
+            # RAG: The analyzer emits a domain-specific `rag_query` (e.g. "medication refusal")
+            # chosen to match guideline vocabulary rather than the caregiver's own words.
             logger.info(f"Retrieving care guidelines for query: '{analysis.rag_query}'")
             retrieved_docs = query_guidelines(analysis.rag_query, n_results=2)
             guidelines_text = "\n\n".join([
@@ -145,7 +158,8 @@ class OrchestratorAgent:
                 for doc in retrieved_docs
             ])
 
-            # Step 3: Care Guidance Service
+            # Step 3: Care Guidance — synthesizes RAG results + patient context into
+            # actionable clinical recommendations and explicit do-not lists.
             context_summary = (
                 f"Clinical Stage: {context.clinical_stage}\n"
                 f"Active Triggers: {', '.join(context.active_triggers)}\n"
@@ -160,7 +174,8 @@ class OrchestratorAgent:
             )
             logger.info("Step 3 Complete.")
 
-            # Step 4: Safety / Escalation Evaluator
+            # Step 4: Safety Evaluation — dedicated agent so safety concerns are never
+            # buried inside a combined coaching response where caregivers might miss them.
             safety = self.safety_expert.run(
                 interaction_summary=analysis.observed_behavior + " - " + analysis.non_verbal_cues,
                 health_risk_factors=context.health_risk_factors,
@@ -192,9 +207,9 @@ class OrchestratorAgent:
             return get_invalid_input_response(description)
         return self.run_pipeline(contents=[description], patient_profile=patient_profile)
 
-    def analyze_file(self, file_path: str, mime_type: str, patient_profile: dict, original_filename: str = None) -> FinalCoachingResponse:
+    def analyze_file(self, file_path: str, mime_type: str, patient_profile: dict, original_filename: Optional[str] = None) -> FinalCoachingResponse:
         filename = original_filename or file_path.split("/")[-1]
-        if self.use_mock:
+        if self.use_mock or not self.client:
             # Immediately resolve file uploads using a mock response based on filename
             return get_mock_coaching_response(filename)
 
@@ -202,6 +217,8 @@ class OrchestratorAgent:
         try:
             logger.info(f"Uploading file {file_path} to Gemini File API...")
             uploaded_file = self.client.files.upload(file=file_path)
+            if not uploaded_file or not uploaded_file.name:
+                raise Exception("Upload failed or returned file has no name")
             logger.info(f"Uploaded file name: {uploaded_file.name}")
 
             # Wait for file to become active
@@ -211,6 +228,8 @@ class OrchestratorAgent:
 
             for i in range(max_retries):
                 file_info = self.client.files.get(name=uploaded_file.name)
+                if not file_info or not file_info.state:
+                    raise Exception("Failed to retrieve file info")
                 state = file_info.state.name if hasattr(file_info.state, 'name') else str(file_info.state)
 
                 if state == "ACTIVE":
@@ -238,7 +257,7 @@ class OrchestratorAgent:
             return get_mock_coaching_response(filename)
 
         finally:
-            if uploaded_file is not None:
+            if uploaded_file is not None and uploaded_file.name is not None and self.client is not None:
                 logger.info(f"Cleaning up file {uploaded_file.name} from Gemini File API...")
                 try:
                     self.client.files.delete(name=uploaded_file.name)

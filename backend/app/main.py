@@ -18,6 +18,7 @@ from app.schemas import FinalCoachingResponse, TranslationRequest
 from app.agents.orchestrator import OrchestratorAgent
 from app.agents.simulator import SimulatorAgent, SimulatorResponse
 from app.agents.conversational_coach import ConversationalCoachAgent
+from app.agents.profile_enricher import ProfileEnricherAgent
 from app.rag import seed_default_guidelines
 from app.mock_responses import get_mock_translation
 
@@ -70,6 +71,8 @@ def cleanup_old_gemini_files():
         print("[Startup] Scanning Gemini File API for orphaned files...", flush=True)
         for f in client.files.list():
             try:
+                if not f.name:
+                    continue
                 print(f"[Startup] Deleting orphaned file: {f.name}", flush=True)
                 client.files.delete(name=f.name)
             except Exception as delete_err:
@@ -134,6 +137,37 @@ def init_db():
             triggers TEXT,
             preferences TEXT,
             background TEXT
+        )
+    """)
+    db_client.execute("""
+        CREATE TABLE IF NOT EXISTS safety_escalations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            urgency_level TEXT NOT NULL,
+            safety_reason TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
+    db_client.execute("""
+        CREATE TABLE IF NOT EXISTS interaction_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_name TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            raw_input TEXT,
+            observed_behavior TEXT,
+            likely_trigger TEXT,
+            risk_level TEXT,
+            try_saying TEXT,
+            avoid_saying TEXT,
+            analysis_json TEXT
+        )
+    """)
+    db_client.execute("""
+        CREATE TABLE IF NOT EXISTS coach_chat_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_name TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL
         )
     """)
 
@@ -250,6 +284,114 @@ def save_patient_profile(profile: dict):
     except Exception as e:
         print(f"Error saving patient profile: {e}")
 
+def save_interaction_log(patient_name: str, raw_input: str, analysis: dict):
+    try:
+        from datetime import datetime, timezone
+        db_client.execute("""
+            INSERT INTO interaction_history (
+                patient_name, timestamp, raw_input, observed_behavior, likely_trigger, risk_level, try_saying, avoid_saying, analysis_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            patient_name,
+            datetime.now(timezone.utc).isoformat(),
+            raw_input,
+            analysis.get("observed_behavior"),
+            analysis.get("likely_trigger"),
+            analysis.get("risk_level"),
+            analysis.get("try_saying"),
+            analysis.get("avoid_saying"),
+            json.dumps(analysis)
+        ))
+    except Exception as e:
+        print(f"Error saving interaction log: {e}")
+
+def save_coach_message(patient_name: str, role: str, content: str):
+    try:
+        from datetime import datetime, timezone
+        db_client.execute("""
+            INSERT INTO coach_chat_history (patient_name, timestamp, role, content)
+            VALUES (?, ?, ?, ?)
+        """, (
+            patient_name,
+            datetime.now(timezone.utc).isoformat(),
+            role,
+            content
+        ))
+    except Exception as e:
+        print(f"Error saving coach message: {e}")
+
+def get_interaction_logs(patient_name: str) -> list:
+    try:
+        rows = db_client.fetchall("""
+            SELECT id, timestamp, raw_input, observed_behavior, likely_trigger, risk_level, try_saying, avoid_saying, analysis_json
+            FROM interaction_history
+            WHERE patient_name = ?
+            ORDER BY id DESC
+        """, (patient_name,))
+        return [
+            {
+                "id": r["id"],
+                "timestamp": r["timestamp"],
+                "raw_input": r["raw_input"],
+                "observed_behavior": r["observed_behavior"],
+                "likely_trigger": r["likely_trigger"],
+                "risk_level": r["risk_level"],
+                "try_saying": r["try_saying"],
+                "avoid_saying": r["avoid_saying"],
+                "analysis": json.loads(r["analysis_json"]) if r["analysis_json"] else {}
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        print(f"Error getting interaction logs: {e}")
+        return []
+
+def get_coach_messages(patient_name: str) -> list:
+    try:
+        rows = db_client.fetchall("""
+            SELECT role, content
+            FROM coach_chat_history
+            WHERE patient_name = ?
+            ORDER BY id ASC
+        """, (patient_name,))
+        return [{"role": r["role"], "content": r["content"]} for r in rows]
+    except Exception as e:
+        print(f"Error getting coach messages: {e}")
+        return []
+
+def clear_patient_history(patient_name: str):
+    try:
+        db_client.execute("DELETE FROM interaction_history WHERE patient_name = ?", (patient_name,))
+        db_client.execute("DELETE FROM coach_chat_history WHERE patient_name = ?", (patient_name,))
+    except Exception as e:
+        print(f"Error clearing history: {e}")
+
+def process_analysis_suggestions_and_log(feedback: FinalCoachingResponse, patient_profile: dict, raw_input: str):
+    """Persists the analysis and populates suggested_triggers with any new triggers not yet in the patient profile."""
+    save_interaction_log(patient_profile["name"], raw_input, feedback.model_dump())
+
+    if feedback.observed_behavior == "Input Insufficient / Invalid":
+        return
+
+    existing_lower = {t.lower() for t in patient_profile.get("triggers", [])}
+    candidates: List[str] = []
+
+    if feedback.behavior_analysis and feedback.behavior_analysis.patient_triggers:
+        for t in feedback.behavior_analysis.patient_triggers:
+            if t and t.lower() not in existing_lower and t not in candidates:
+                candidates.append(t)
+
+    if (
+        feedback.likely_trigger
+        and feedback.likely_trigger not in ("N/A", "N/A - Insufficient description details")
+        and feedback.likely_trigger.lower() not in existing_lower
+        and feedback.likely_trigger not in candidates
+    ):
+        candidates.append(feedback.likely_trigger)
+
+    if candidates:
+        feedback.suggested_triggers = candidates
+
 # HTTP Request Schemas
 class PatientProfileSchema(BaseModel):
     name: str
@@ -311,6 +453,7 @@ def analyze_text(request: TextAnalysisRequest, api_key: Optional[str] = Depends(
     patient_profile = load_patient_profile(request.patient_name)
     try:
         feedback = orchestrator.analyze_text(request.description, patient_profile)
+        process_analysis_suggestions_and_log(feedback, patient_profile, request.description)
         return feedback
     except Exception as e:
         print(f"[Error] Text analysis failed: {e}")
@@ -324,7 +467,8 @@ def analyze_file(file: UploadFile = File(...), patient_name: Optional[str] = For
     patient_profile = load_patient_profile(patient_name)
 
     # Save uploaded file to a temporary file
-    suffix = os.path.splitext(file.filename)[1]
+    filename = file.filename or "uploaded_file"
+    suffix = os.path.splitext(filename)[1]
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
         shutil.copyfileobj(file.file, temp_file)
         temp_path = temp_file.name
@@ -332,10 +476,11 @@ def analyze_file(file: UploadFile = File(...), patient_name: Optional[str] = For
     try:
         feedback = orchestrator.analyze_file(
             file_path=temp_path,
-            mime_type=file.content_type,
+            mime_type=file.content_type or "application/octet-stream",
             patient_profile=patient_profile,
             original_filename=file.filename
         )
+        process_analysis_suggestions_and_log(feedback, patient_profile, f"Uploaded file: {filename}")
         return feedback
     except Exception as e:
         print(f"[Error] File analysis failed: {e}")
@@ -374,6 +519,8 @@ def translate_feedback(request: TranslationRequest, api_key: Optional[str] = Dep
                 response_schema=FinalCoachingResponse
             )
         )
+        if not response.text:
+            return get_mock_translation(request.coaching_response, request.target_language)
         return FinalCoachingResponse.model_validate_json(response.text)
     except Exception as e:
         print(f"[Error] Translation failed: {e}")
@@ -403,8 +550,28 @@ def coach_chat(request: CoachChatRequest, api_key: Optional[str] = Depends(verif
     client = orchestrator.client
     if orchestrator.use_mock or not client:
         last_message = request.chat_history[-1]["content"] if request.chat_history else ""
+        response_text = f"[MOCK COACH] I hear your concern about {patient_profile.get('name')} regarding '{last_message}'. Remember to use validation therapy: connect before correcting."
+        if request.chat_history:
+            save_coach_message(patient_profile["name"], "user", last_message)
+        save_coach_message(patient_profile["name"], "assistant", response_text)
+
+        # Simulating suggested updates for testing in mock mode
+        suggested_updates = None
+        last_lower = last_message.lower()
+        if "bright light" in last_lower or "glare" in last_lower:
+            suggested_updates = {
+                "new_triggers": ["bright lights"],
+                "new_preferences": []
+            }
+        elif "music" in last_lower or "song" in last_lower:
+            suggested_updates = {
+                "new_triggers": [],
+                "new_preferences": ["listening to music"]
+            }
+
         return {
-            "response": f"[MOCK COACH] I hear your concern about Maria regarding '{last_message}'. Remember to use validation therapy: connect before correcting."
+            "response": response_text,
+            "suggested_profile_updates": suggested_updates
         }
 
     try:
@@ -414,10 +581,46 @@ def coach_chat(request: CoachChatRequest, api_key: Optional[str] = Depends(verif
             patient_profile=patient_profile,
             feedback_context=request.feedback_context
         )
-        return {"response": response_text}
+        if request.chat_history:
+            save_coach_message(patient_profile["name"], "user", request.chat_history[-1]["content"])
+        save_coach_message(patient_profile["name"], "assistant", response_text)
+
+        # Run ProfileEnricherAgent
+        suggested_updates = None
+        try:
+            enricher = ProfileEnricherAgent(client)
+            enricher_res = enricher.run(
+                chat_history=request.chat_history + [{"role": "assistant", "content": response_text}],
+                patient_profile=patient_profile
+            )
+            if enricher_res.new_triggers or enricher_res.new_preferences:
+                suggested_updates = {
+                    "new_triggers": enricher_res.new_triggers,
+                    "new_preferences": enricher_res.new_preferences
+                }
+        except Exception as enrich_err:
+            print(f"Profile enrichment failed: {enrich_err}")
+
+        return {
+            "response": response_text,
+            "suggested_profile_updates": suggested_updates
+        }
     except Exception as e:
         print(f"[Error] Coach chat failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Coach chat session failed. Please check backend logs."
         )
+
+@app.get("/patient/{name}/interactions")
+def get_interactions_endpoint(name: str, api_key: Optional[str] = Depends(verify_user_key)):
+    return get_interaction_logs(name)
+
+@app.get("/patient/{name}/coach-chat")
+def get_coach_chat_endpoint(name: str, api_key: Optional[str] = Depends(verify_user_key)):
+    return get_coach_messages(name)
+
+@app.delete("/patient/{name}/history")
+def delete_history_endpoint(name: str, api_key: Optional[str] = Depends(verify_user_key)):
+    clear_patient_history(name)
+    return {"status": "success", "message": f"Cleared history for {name}"}

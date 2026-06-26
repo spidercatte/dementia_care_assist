@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Info,
   Clock,
+  History,
   Video,
   VideoOff,
   Mic,
@@ -218,6 +219,10 @@ function App() {
   const [newTrigger, setNewTrigger] = useState('');
   const [newPreference, setNewPreference] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [suggestedUpdates, setSuggestedUpdates] = useState(null); // { triggers: [], preferences: [] }
+  const [interactionLogs, setInteractionLogs] = useState([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [expandedLogId, setExpandedLogId] = useState(null);
 
   // Analysis State
   const [inputText, setInputText] = useState('');
@@ -414,6 +419,87 @@ function App() {
     }
   };
 
+  const loadPatientHistory = async (name) => {
+    if (!name) return;
+    setIsHistoryLoading(true);
+    setSuggestedUpdates(null); // Clear suggestions on switch
+    try {
+      if (backendStatus === 'online') {
+        // Fetch interactions
+        const intRes = await secureFetch(`${BACKEND_URL}/patient/${name}/interactions`);
+        if (intRes.ok) {
+          const logs = await intRes.json();
+          setInteractionLogs(logs);
+        }
+
+        // Fetch coach chat
+        const chatRes = await secureFetch(`${BACKEND_URL}/patient/${name}/coach-chat`);
+        if (chatRes.ok) {
+          const chats = await chatRes.json();
+          setCoachChatHistory(chats);
+        } else {
+          setCoachChatHistory([]);
+        }
+      } else {
+        setInteractionLogs([]);
+        setCoachChatHistory([]);
+      }
+    } catch (e) {
+      console.error("Error loading patient history:", e);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  const handleApplySuggestedUpdate = async (type, value) => {
+    if (!value) return;
+    let updatedPatient = { ...patient };
+    if (type === 'trigger') {
+      if (patient.triggers.includes(value)) return;
+      updatedPatient.triggers = [...patient.triggers, value];
+    } else if (type === 'preference') {
+      if (patient.preferences.includes(value)) return;
+      updatedPatient.preferences = [...patient.preferences, value];
+    }
+
+    setPatient(updatedPatient);
+
+    // Save to backend database
+    if (backendStatus === 'online') {
+      try {
+        const res = await secureFetch(`${BACKEND_URL}/patient`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedPatient)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPatient(data);
+          setPatientsList(prev => prev.map(p => p.name === data.name ? data : p));
+        }
+      } catch (e) {
+        console.error('Failed to auto-save update to backend:', e);
+      }
+    }
+
+    // Remove from suggestions
+    if (suggestedUpdates) {
+      setSuggestedUpdates(prev => {
+        if (!prev) return null;
+        return {
+          triggers: type === 'trigger' ? prev.triggers.filter(t => t !== value) : prev.triggers,
+          preferences: type === 'preference' ? prev.preferences.filter(p => p !== value) : prev.preferences
+        };
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (patient && patient.name) {
+      loadPatientHistory(patient.name);
+    }
+  }, [patient.name, backendStatus]);
+
   // Check backend health on load
   useEffect(() => {
     checkBackendHealth();
@@ -556,6 +642,15 @@ function App() {
                     const data = await res.json();
                     setAnalysisResult(data);
                     setAnalysisSourceType(wasFileUploaded ? 'file' : 'text');
+                    if (data.suggested_triggers && data.suggested_triggers.length > 0) {
+                      setSuggestedUpdates({
+                        triggers: data.suggested_triggers,
+                        preferences: []
+                      });
+                    } else {
+                      setSuggestedUpdates(null);
+                    }
+                    loadPatientHistory(patient.name);
                     if (data.observed_behavior && data.observed_behavior !== "Input Insufficient / Invalid") {
                       setCoachChatHistory([
                         {
@@ -572,6 +667,10 @@ function App() {
                     const mockResult = MOCK_ANALYSIS_MED_REFUSAL;
                     setAnalysisResult(mockResult); // Fallback on failure
                     setAnalysisSourceType(wasFileUploaded ? 'file' : 'text');
+                    setSuggestedUpdates({
+                      triggers: ["being rushed"],
+                      preferences: []
+                    });
                     setCoachChatHistory([
                       {
                         role: 'assistant',
@@ -584,6 +683,10 @@ function App() {
                   const mockResult = MOCK_ANALYSIS_MED_REFUSAL;
                   setAnalysisResult(mockResult);
                   setAnalysisSourceType(wasFileUploaded ? 'file' : 'text');
+                  setSuggestedUpdates({
+                    triggers: ["being rushed"],
+                    preferences: []
+                  });
                   setCoachChatHistory([
                     {
                       role: 'assistant',
@@ -596,6 +699,10 @@ function App() {
                 const mockResult = MOCK_ANALYSIS_MED_REFUSAL;
                 setAnalysisResult(mockResult);
                 setAnalysisSourceType(wasFileUploaded ? 'file' : 'text');
+                setSuggestedUpdates({
+                  triggers: ["being rushed"],
+                  preferences: []
+                });
                 setCoachChatHistory([
                   {
                     role: 'assistant',
@@ -634,17 +741,44 @@ function App() {
           })
         });
         if (res.ok) {
-          const data = await res.json();
-          setCoachChatHistory([...updatedHistory, { role: 'assistant', content: data.response }]);
+           const data = await res.json();
+           setCoachChatHistory([...updatedHistory, { role: 'assistant', content: data.response }]);
+           if (data.suggested_profile_updates) {
+             setSuggestedUpdates(prev => {
+               const currentTriggers = prev?.triggers || [];
+               const currentPrefs = prev?.preferences || [];
+               const newTriggers = data.suggested_profile_updates.new_triggers || [];
+               const newPrefs = data.suggested_profile_updates.new_preferences || [];
+               return {
+                 triggers: [...new Set([...currentTriggers, ...newTriggers])],
+                 preferences: [...new Set([...currentPrefs, ...newPrefs])]
+               };
+             });
+           }
         } else {
           setCoachChatHistory([...updatedHistory, { role: 'assistant', content: "[COACH] I'm sorry, I ran into an error connecting to my database. Let's try again in a moment." }]);
         }
       } else {
         setTimeout(() => {
+          const responseText = `[MOCK COACH] I hear your concern about ${patient.name}. Remember, validation therapy is key. Try validating their emotions rather than correcting facts.`;
           setCoachChatHistory([...updatedHistory, {
             role: 'assistant',
-            content: `[MOCK COACH] I hear your concern about ${patient.name}. Remember, validation therapy is key. Try validating their emotions rather than correcting facts.`
+            content: responseText
           }]);
+
+          // Simulating trigger/preference extraction based on input keywords
+          const lastLower = userMsg.content.toLowerCase();
+          if (lastLower.includes("bright") || lastLower.includes("glare")) {
+            setSuggestedUpdates(prev => ({
+              triggers: [...new Set([...(prev?.triggers || []), "bright lights"])],
+              preferences: prev?.preferences || []
+            }));
+          } else if (lastLower.includes("music") || lastLower.includes("song")) {
+            setSuggestedUpdates(prev => ({
+              triggers: prev?.triggers || [],
+              preferences: [...new Set([...(prev?.preferences || []), "listening to music"])]
+            }));
+          }
         }, 1000);
       }
     } catch (err) {
@@ -1441,6 +1575,54 @@ function App() {
                 Coaching Feedback
               </h2>
 
+              {/* Human-in-the-Loop Profile Enrichment Banners */}
+              {suggestedUpdates && (suggestedUpdates.triggers?.length > 0 || suggestedUpdates.preferences?.length > 0) && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+                  {suggestedUpdates.triggers?.map((trigger, idx) => (
+                    <div key={`st-${idx}`} style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      background: 'rgba(245, 158, 11, 0.06)',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      borderRadius: '10px', padding: '0.75rem 1rem', gap: '0.75rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--text-main)' }}>
+                        <AlertTriangle size={15} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />
+                        <span>New trigger detected: <strong>"{trigger}"</strong>. Add to {patient.name}'s profile?</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: '0.2rem 0.7rem', fontSize: '0.8rem', flexShrink: 0 }}
+                        onClick={() => handleApplySuggestedUpdate('trigger', trigger)}
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  ))}
+                  {suggestedUpdates.preferences?.map((pref, idx) => (
+                    <div key={`sp-${idx}`} style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      background: 'rgba(16, 185, 129, 0.06)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      borderRadius: '10px', padding: '0.75rem 1rem', gap: '0.75rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--text-main)' }}>
+                        <Heart size={15} style={{ color: 'var(--color-success)', flexShrink: 0 }} />
+                        <span>New preference detected: <strong>"{pref}"</strong>. Add to {patient.name}'s profile?</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: '0.2rem 0.7rem', fontSize: '0.8rem', flexShrink: 0 }}
+                        onClick={() => handleApplySuggestedUpdate('preference', pref)}
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {!analysisResult && !isAnalyzing && (
                 <div style={{ textAlign: 'center', padding: '4rem 1.5rem', color: 'var(--text-muted)' }}>
                   <Activity size={48} style={{ opacity: 0.2, margin: '0 auto 1rem' }} />
@@ -1918,6 +2100,85 @@ function App() {
                 {isSavingProfile ? 'Saving...' : 'Save Patient Profile'}
               </button>
             </form>
+
+            {/* Interaction History Timeline */}
+            {(interactionLogs.length > 0 || isHistoryLoading) && (
+              <div style={{ marginTop: '2rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <History size={18} style={{ color: 'var(--primary)' }} />
+                  Interaction History ({interactionLogs.length})
+                </h3>
+                {isHistoryLoading ? (
+                  <div style={{ textAlign: 'center', padding: '1rem' }}>
+                    <RefreshCw className="spinner" size={20} style={{ margin: '0 auto', color: 'var(--primary)' }} />
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {interactionLogs.map((log) => (
+                      <div
+                        key={log.id}
+                        className="glass-card"
+                        style={{
+                          padding: '1rem',
+                          cursor: 'pointer',
+                          background: expandedLogId === log.id ? 'rgba(6, 182, 212, 0.04)' : 'var(--bg-card)',
+                          borderColor: expandedLogId === log.id ? 'var(--primary)' : 'var(--border-color)'
+                        }}
+                        onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <span style={{
+                                fontSize: '0.75rem', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 600,
+                                background: log.risk_level === 'HIGH' || log.risk_level === 'EMERGENCY' ? 'rgba(239,68,68,0.1)' : log.risk_level === 'MEDIUM' ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)',
+                                color: log.risk_level === 'HIGH' || log.risk_level === 'EMERGENCY' ? 'var(--color-danger)' : log.risk_level === 'MEDIUM' ? 'var(--color-warning)' : 'var(--color-success)',
+                                border: `1px solid ${log.risk_level === 'HIGH' || log.risk_level === 'EMERGENCY' ? 'rgba(239,68,68,0.3)' : log.risk_level === 'MEDIUM' ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)'}`
+                              }}>
+                                {log.risk_level || 'LOW'}
+                              </span>
+                              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                                {log.observed_behavior || 'Interaction Log'}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '1rem', marginTop: '0.35rem', fontSize: '0.8rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <Clock size={12} />{new Date(log.timestamp).toLocaleString()}
+                              </span>
+                              {log.likely_trigger && <span>Trigger: {log.likely_trigger}</span>}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--primary)', flexShrink: 0 }}>
+                            {expandedLogId === log.id ? '▲ Hide' : '▼ View'}
+                          </span>
+                        </div>
+
+                        {expandedLogId === log.id && (
+                          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>
+                            {log.raw_input && (
+                              <div>
+                                <p style={{ fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Input:</p>
+                                <p style={{ color: 'var(--text-light)', lineHeight: '1.4', fontStyle: 'italic' }}>"{log.raw_input}"</p>
+                              </div>
+                            )}
+                            {log.try_saying && (
+                              <div className="dialogue-line try" style={{ fontSize: '0.85rem' }}>
+                                <strong>TRY:</strong> {log.try_saying}
+                              </div>
+                            )}
+                            {log.avoid_saying && (
+                              <div className="dialogue-line avoid" style={{ fontSize: '0.85rem' }}>
+                                <strong>AVOID:</strong> {log.avoid_saying}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
