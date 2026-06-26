@@ -33,8 +33,9 @@ DementiaCare Coach is a multi-modal AI agent that:
 
 | Concept | Where |
 |---|---|
-| **Multi-agent system (ADK)** | `adk-agent-scaffold/app/agent.py` — ADK conversational coach; `backend/app/agents/` — 6-agent pipeline |
+| **Multi-agent system (ADK)** | `adk-agent-scaffold/app/agent.py` — ADK conversational coach; `backend/app/agents/` — 7-agent pipeline |
 | **MCP Server** | `backend/app/mcp_server.py` — FastMCP over SSE, consumed by the ADK agent |
+| **Human-in-the-Loop (HITL)** | `ProfileEnricherAgent` detects new triggers/preferences from coach conversations; surfaces them to the caregiver for approval before updating the patient profile |
 | **Security features** | `backend/app/main.py` — API key auth (`X-API-Key`), rate limiting (60 req/min/IP), CORS |
 | **Deployability** | `docker-compose.yaml` — 4-service stack (PostgreSQL, ChromaDB, FastAPI backend, React frontend) |
 | **Antigravity** | See video demo |
@@ -53,7 +54,9 @@ DementiaCare Coach is a multi-modal AI agent that:
 ┌──────────────────────▼──────────────────────────────────────────┐
 │                    FastAPI Backend                               │
 │                                                                 │
-│   /analyze/text   /analyze/file   /simulator/step   /coach/chat │
+│   /analyze/text   /analyze/file   /simulator/step   /coach/chat  │
+│   /patient/{name}/interactions   /patient/{name}/coach-chat      │
+│   DELETE /patient/{name}/history                                 │
 │         │                │                │               │     │
 │  ┌──────▼────────────────▼──────┐   ┌─────▼───────────────▼──┐ │
 │  │   OrchestratorAgent          │   │  SimulatorAgent /       │ │
@@ -82,7 +85,18 @@ DementiaCare Coach is a multi-modal AI agent that:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### The 6-Agent Pipeline (detail)
+### Database Tables
+
+| Table | Purpose |
+|---|---|
+| `patients` | Patient profile (name, dementia type, triggers, preferences, medications, conditions, allergies, fall risk, mobility aids, diet texture, sensory aids) |
+| `interaction_history` | One row per analysis run — stores raw input, observed behavior, likely trigger, risk level, try/avoid phrases, and full JSON response |
+| `coach_chat_history` | Persists every caregiver ↔ coach message per patient; reloaded when the caregiver returns |
+| `safety_escalations` | HIGH/EMERGENCY safety flags written by `SafetyEvaluator` via the MCP `log_safety_escalation` tool, for clinician audit |
+
+---
+
+### The 7-Agent Pipeline (detail)
 
 Each step is a dedicated Gemini agent with a narrow system prompt and an enforced Pydantic output schema (`response_mime_type="application/json"`). Splitting across agents reduces hallucination: each agent is primed only with context relevant to its task, and failures are diagnosable per step.
 
@@ -95,6 +109,7 @@ Each step is a dedicated Gemini agent with a narrow system prompt and an enforce
 | 3 | `CareGuidanceService` | `CareGuidanceResponse` | Synthesize RAG results into clinical recommendations & do-not lists |
 | 4 | `SafetyEvaluator` | `SafetyEscalationResponse` | Dedicated safety pass — never buried in coaching output |
 | 5 | `CoachingSynthesizer` | `FinalCoachingResponse` | Assemble full coaching response with scripts, strengths, recommendations |
+| 6 | `ProfileEnricherAgent` | `ProfileEnrichmentResponse` | Runs after each coach chat turn; detects new triggers/preferences worth adding to the patient profile and returns them as HITL suggestions |
 
 ---
 
@@ -104,7 +119,9 @@ Each step is a dedicated Gemini agent with a narrow system prompt and an enforce
 - **Behavioral timeline** — chronological breakdown of patient behavior with clinical symptom labels
 - **Coaching scripts** — exact "Try saying / Avoid saying" dialog pairs
 - **Interactive simulator** — roleplay as a caregiver with a simulated patient (Maria / Arthur); agitation level updates dynamically
-- **Conversational coach** — follow-up chat powered by the ADK agent via MCP
+- **Conversational coach** — follow-up chat powered by the ADK agent via MCP; chat history is persisted per patient and reloaded across sessions
+- **Interaction history** — every analysis run is logged to the database; the Profile tab shows a timeline of past interactions with risk-level badges, observed behavior, trigger, and expandable Try/Avoid phrases
+- **HITL profile enrichment** — after each coach chat exchange, `ProfileEnricherAgent` detects new behavioral triggers or patient preferences mentioned in conversation and surfaces them as suggestions; the caregiver approves each one before it is written to the patient profile
 - **Multi-language support** — detects interaction language; translate coaching to caregiver's native language
 - **Safety escalation** — HIGH/EMERGENCY alerts persisted to database for clinician review
 - **RAG-grounded guidance** — recommendations cite indexed clinical protocols
@@ -256,7 +273,8 @@ dementia_care/
 │   │   │   ├── safety_escalation.py     # Step 4: safety audit
 │   │   │   ├── caregiver_coaching.py    # Step 5: final coaching output
 │   │   │   ├── simulator.py             # Interactive training simulator
-│   │   │   └── conversational_coach.py  # Follow-up chat agent
+│   │   │   ├── conversational_coach.py  # Follow-up chat agent
+│   │   │   └── profile_enricher.py      # Step 6: HITL profile enrichment suggestions
 │   │   ├── main.py                      # FastAPI routes + auth + rate limiting
 │   │   ├── mcp_server.py                # FastMCP tools (MCP over SSE)
 │   │   ├── rag.py                       # ChromaDB + Gemini embeddings
