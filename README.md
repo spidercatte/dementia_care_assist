@@ -50,44 +50,52 @@ DementiaCare Coach is a multi-modal AI agent that:
 │                        React Frontend                           │
 │   (Analysis tab | Simulator tab | Coach chat | RAG viewer)      │
 └──────────────────────┬──────────────────────────────────────────┘
-                       │ REST (VITE_BACKEND_URL)
-┌──────────────────────▼──────────────────────────────────────────┐
-│                 FastAPI Backend  :8000                           │
-│                                                                 │
-│   /analyze/text   /analyze/file   /simulator/step   /coach/chat  │
-│   /patient/{name}/interactions   /patient/{name}/coach-chat      │
-│   DELETE /patient/{name}/history                                 │
-│         │                │                │               │     │
-│  ┌──────▼────────────────▼──────┐   ┌─────▼───────────────▼──┐ │
-│  │   OrchestratorAgent          │   │  SimulatorAgent /       │ │
-│  │   6-Step Sequential Pipeline │   │  ConversationalCoach    │ │
-│  │                              │   └────────────────────────┘ │
-│  │  Step 0: ValidationService   │                              │
-│  │  Step 1: InteractionAnalyzer │◄── Gemini File API           │
-│  │  Step 2: PatientContext      │    (video/audio upload)      │
-│  │     RAG: Vertex AI Search ───┼──► Vertex AI Search (prod)   │
-│  │          └─ ChromaDB fallback┼──► ChromaDB :8001 (local)   │
-│  │  Step 3: CareGuidanceService │                              │
-│  │  Step 4: SafetyEvaluator     │                              │
-│  │  Step 5: CoachingSynthesizer │                              │
-│  └──────────────────────────────┘                              │
-└─────────────────────────────────────────────────────────────────┘
-                        │ MCP SSE (:8002)
-┌───────────────────────▼─────────────────────────────────────────┐
-│              MCP Server (mcp_server/)  :8002                    │
-│   FastMCP over SSE — standalone service                         │
-│   tools: get_patient_profile    (→ PostgreSQL)                  │
-│           log_safety_escalation (→ PostgreSQL)                  │
-│           search_patients       (→ Vertex AI Search / DB)       │
-│           query_care_guidelines (→ Vertex AI Search / ChromaDB) │
-└───────────────────────┬─────────────────────────────────────────┘
-                        │ MCP SSE
-┌───────────────────────▼─────────────────────────────────────────┐
-│              ADK Agent Scaffold (adk-agent-scaffold/)           │
-│   google.adk.agents.Agent — conversational dementia coach       │
-│   Tools: get_patient_profile | log_safety_escalation |          │
-│           search_patients | query_care_guidelines               │
-└─────────────────────────────────────────────────────────────────┘
+                       │ REST
+         ┌─────────────▼──────────────┐
+         │   FastAPI Backend  :8000   │
+         │                            │
+         │  /analyze/text             │◄── Gemini File API
+         │  /analyze/file             │    (video/audio upload)
+         │  /simulator/step           │
+         │  /coach/chat               │
+         │  /patient/{name}/...       │
+         │                            │
+         │  7-Agent Pipeline:         │
+         │  0: ValidationService      │
+         │  1: InteractionAnalyzer    │
+         │  2: PatientContextProcessor│
+         │  3: CareGuidanceService    │
+         │  4: SafetyEvaluator        │
+         │  5: CoachingSynthesizer    │
+         │  6: ProfileEnricherAgent   │
+         └──────┬──────────┬──────────┘
+                │          │
+         direct │          │ direct
+         SQL    │          │ RAG query
+                │          │
+                ▼          ▼
+┌────────────────┐  ┌───────────────────────────┐
+│  PostgreSQL    │  │  Vertex AI Search  (prod) │
+│  :5432         │  │  ChromaDB :8001    (local) │
+└────────┬───────┘  └──────────────┬────────────┘
+         │   (shared data stores)  │
+         │    via common/ library  │
+         │                         │
+┌────────┴─────────────────────────┴────────────┐
+│          MCP Server (mcp_server/)  :8002       │
+│  FastMCP over SSE — standalone service         │
+│  tools:                                        │
+│    get_patient_profile    (→ PostgreSQL)        │
+│    log_safety_escalation  (→ PostgreSQL)        │
+│    search_patients        (→ Vertex AI / DB)   │
+│    query_care_guidelines  (→ Vertex AI / Chroma)│
+└──────────────────────┬─────────────────────────┘
+                       │ MCP over SSE
+         ┌─────────────▼──────────────────────────┐
+         │   ADK Agent Scaffold (adk-agent-scaffold/) │
+         │   google.adk.agents.Agent              │
+         │   conversational dementia coach         │
+         └────────────────────────────────────────┘
 ```
 
 ### Database Tables
