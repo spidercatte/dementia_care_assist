@@ -226,6 +226,12 @@ __marimo__/
 # Claude Code
 .claude/settings.local.json
 
+# Terraform — never commit state (contains plaintext secrets)
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+
 # Playwright
 test-results/
 playwright-report/
