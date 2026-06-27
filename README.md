@@ -232,6 +232,58 @@ adk run app
 
 ---
 
+### Option D: Deploy to GCP (Production)
+
+The full production stack runs on Google Cloud. One script handles everything end-to-end.
+
+**GCP services provisioned:**
+
+| Service | Purpose |
+|---|---|
+| Cloud Run | Backend, MCP server, and React frontend (3 separate services) |
+| Cloud SQL (PostgreSQL 15) | Patient data, interaction history, safety escalations |
+| Cloud Build | Builds Docker images for backend, MCP, and frontend |
+| Secret Manager | Stores `GEMINI_API_KEY`, `USER_API_KEY`, `ADMIN_API_KEY`, `DB_PASSWORD` |
+| Vertex AI Search | Production RAG retrieval for clinical guidelines and patient records |
+| Vertex AI Reasoning Engine | Hosts the deployed ADK conversational agent |
+| IAM | Service account with least-privilege roles |
+
+**Prerequisites:**
+
+```bash
+# Install dependencies
+gcloud auth login
+gcloud auth application-default login
+
+# Set your project config in:
+# adk-agent-scaffold/deployment/terraform/single-project/vars/env.tfvars
+```
+
+**Deploy everything:**
+
+```bash
+export GEMINI_API_KEY=your_key_here
+bash scripts/deploy_prod.sh
+```
+
+This script:
+1. Enables required GCP APIs
+2. Builds backend, MCP, and frontend images via Cloud Build
+3. Provisions Cloud SQL, Cloud Run services, and Secret Manager secrets via Terraform
+4. Retrieves the deployed backend and MCP URLs, injects them into the frontend build
+5. Deploys the ADK agent to Vertex AI Reasoning Engine via `agents-cli deploy`
+
+At the end it prints the live Frontend URL, Backend URL, MCP URL, and generated API keys.
+
+**Partial deploys** (redeploy one service without touching others):
+
+```bash
+bash scripts/deploy_prod_backend.sh    # backend only
+bash scripts/deploy_prod_frontend.sh   # frontend only
+```
+
+---
+
 ## Environment Variables
 
 | Variable | Required | Description |
@@ -261,17 +313,18 @@ This project uses the **Antigravity** agent framework. All project skills, hooks
 ├── CONTEXT.md         # Secure coding standards and paved-road patterns
 ├── hooks.json         # Pre-tool-use hooks (e.g. validate tool calls before execution)
 ├── skills/            # Reusable skills invocable by the agent
-│   ├── dementiacare-run-all/       # Boot the full stack (setup → backend → RAG → frontend)
-│   ├── dementiacare-run-backend/   # Start the FastAPI backend only
-│   ├── dementiacare-run-frontend/  # Start the React frontend only
-│   ├── dementiacare-seed-rag/      # Seed ChromaDB with clinical guidelines
-│   ├── dementiacare-setup/         # Install dependencies
-│   ├── dementiacare-cleanup-ports/ # Kill processes on ports 8000 / 5173
-│   ├── dementiacare-deploy-backend/
-│   ├── dementiacare-deploy-frontend/
-│   └── stride-threat-model/        # Generate a STRIDE threat model
+│   ├── dementiacare-setup/          # Install all Python and Node dependencies
+│   ├── dementiacare-run-all/        # Full stack: setup → seed RAG → backend → frontend
+│   ├── dementiacare-run-backend/    # Start the FastAPI backend only
+│   ├── dementiacare-run-frontend/   # Start the Vite React frontend only
+│   ├── dementiacare-seed-rag/       # Seed ChromaDB with clinical guidelines
+│   ├── dementiacare-stop-all/       # Stop backend and frontend processes
+│   ├── dementiacare-cleanup-ports/  # Kill any process on ports 8000 / 5173
+│   ├── dementiacare-deploy-backend/ # Build & deploy backend to Cloud Run (prod)
+│   ├── dementiacare-deploy-frontend/# Build & deploy frontend to Cloud Run (prod)
+│   └── stride-threat-model/         # Run a STRIDE threat model assessment
 └── scripts/
-    └── validate_tool_call.py       # Hook script: validate agent tool call inputs
+    └── validate_tool_call.py        # Hook script: validates agent tool call inputs
 ```
 
 Each skill is self-contained with a `SKILL.md` that describes its steps and purpose.
