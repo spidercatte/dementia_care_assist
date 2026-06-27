@@ -3,8 +3,8 @@ import json
 from datetime import datetime, timezone
 from typing import Optional
 from mcp.server.fastmcp import FastMCP
-from app.database import db_client
-from app.config import settings
+from common.database import db_client
+from common.config import settings
 
 logger = logging.getLogger("dementiacare-mcp")
 
@@ -48,6 +48,7 @@ def get_patient_profile(name: Optional[str] = None) -> str:
         logger.error(f"Error fetching patient profile via MCP: {e}")
     return json.dumps({"error": "Patient not found"}, indent=2)
 
+
 @mcp.tool()
 def log_safety_escalation(urgency_level: str, safety_reason: str) -> str:
     """Logs a critical safety hazard or clinician escalation alert to the database for clinician review.
@@ -62,8 +63,6 @@ def log_safety_escalation(urgency_level: str, safety_reason: str) -> str:
     msg = f"[SAFETY ESCALATION] Urgency: {urgency_level} | Detail: {safety_reason}"
     logger.warning(msg)
     try:
-        # Persist to DB so clinicians can review alerts after the session ends.
-        # In-memory logging alone is insufficient — HIGH/EMERGENCY alerts must survive restarts.
         db_client.execute(
             "INSERT INTO safety_escalations (urgency_level, safety_reason, created_at) VALUES (?, ?, ?)",
             (urgency_level, safety_reason, datetime.now(timezone.utc).isoformat())
@@ -72,6 +71,7 @@ def log_safety_escalation(urgency_level: str, safety_reason: str) -> str:
     except Exception as e:
         logger.error(f"Failed to persist safety escalation to DB: {e}")
         return f"Safety alert logged (DB write failed). {msg}"
+
 
 @mcp.tool()
 def search_patients(query: str) -> str:
@@ -86,7 +86,7 @@ def search_patients(query: str) -> str:
         A JSON string containing matching patient profile summaries.
     """
     try:
-        from app.vertex_search import query_patient_search
+        from common.vertex_search import query_patient_search
 
         if settings.vertex_search_project_id and settings.vertex_patient_datastore_id:
             results = query_patient_search(query, n_results=3)
@@ -110,7 +110,6 @@ def search_patients(query: str) -> str:
 
 
 def _db_patient_search(query: str) -> list[dict]:
-    """Scan all patients from the DB and return summaries (used when Vertex AI Search is unavailable)."""
     try:
         rows = db_client.fetchall(
             "SELECT name, dementia_type, triggers, preferences, background, fall_risk, care_notes FROM patients"
@@ -154,10 +153,9 @@ def query_care_guidelines(behavior: str) -> str:
         A JSON string containing the top matching guidelines with titles and clinical text.
     """
     try:
-        from app.vertex_search import query_vertex_search
-        from app.rag import query_guidelines
+        from common.vertex_search import query_vertex_search
+        from common.rag import query_guidelines
 
-        # Use Vertex AI Search when configured, fall back to ChromaDB
         if settings.vertex_search_project_id and settings.vertex_search_datastore_id:
             results = query_vertex_search(behavior, n_results=4)
             source = "vertex_ai_search"
@@ -184,3 +182,10 @@ def query_care_guidelines(behavior: str) -> str:
     except Exception as e:
         logger.error(f"Error querying care guidelines via MCP: {e}")
         return json.dumps({"error": str(e)})
+
+
+# Standalone entrypoint
+from fastapi import FastAPI
+mcp_app = mcp.sse_app()
+app = FastAPI(title="Dementia Care MCP Server Gateway")
+app.mount("/mcp", mcp_app)

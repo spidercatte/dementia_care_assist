@@ -268,6 +268,110 @@ resource "google_cloud_run_service_iam_member" "backend_invoker" {
 }
 
 # ==============================================================================
+# MCP Service (FastMCP on Cloud Run)
+# ==============================================================================
+
+resource "google_cloud_run_v2_service" "mcp_service" {
+  name                = "${var.project_name}-mcp"
+  project             = var.project_id
+  location            = var.region
+  deletion_protection = false
+
+  template {
+    service_account = google_service_account.app_sa.email
+
+    containers {
+      image = "gcr.io/${var.project_id}/${var.project_name}-mcp:latest"
+
+      ports {
+        container_port = 8002
+      }
+
+      env {
+        name = "GEMINI_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.gemini_api_key.id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name  = "DB_USER"
+        value = google_sql_user.db_user.name
+      }
+
+      env {
+        name = "DB_PASSWORD"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.db_password.id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name  = "DB_HOST"
+        value = "/cloudsql/${google_sql_database_instance.postgres.connection_name}"
+      }
+
+      env {
+        name  = "DB_NAME"
+        value = google_sql_database.dementia_care_db.name
+      }
+
+      env {
+        name  = "VERTEX_SEARCH_PROJECT_ID"
+        value = var.project_id
+      }
+
+      env {
+        name  = "VERTEX_SEARCH_LOCATION"
+        value = "global"
+      }
+
+      env {
+        name  = "VERTEX_SEARCH_DATASTORE_ID"
+        value = "dementia-care-guidelines"
+      }
+
+      env {
+        name  = "VERTEX_PATIENT_DATASTORE_ID"
+        value = "dementia-care-patients"
+      }
+
+      volume_mounts {
+        name       = "cloudsql"
+        mount_path = "/cloudsql"
+      }
+    }
+
+    volumes {
+      name = "cloudsql"
+      cloud_sql_instance {
+        instances = [google_sql_database_instance.postgres.connection_name]
+      }
+    }
+  }
+
+  depends_on = [
+    google_project_iam_member.app_sa_secret_accessor,
+    google_secret_manager_secret_version.gemini_api_key_version,
+    google_secret_manager_secret_version.db_password_version
+  ]
+}
+
+resource "google_cloud_run_service_iam_member" "mcp_invoker" {
+  location = google_cloud_run_v2_service.mcp_service.location
+  project  = var.project_id
+  service  = google_cloud_run_v2_service.mcp_service.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+# ==============================================================================================
 # Frontend UI Service (React SPA on Cloud Run)
 # ==============================================================================
 
@@ -313,4 +417,9 @@ output "backend_url" {
 output "frontend_url" {
   description = "The URL of the Frontend Cloud Run service"
   value       = google_cloud_run_v2_service.frontend_service.uri
+}
+
+output "mcp_url" {
+  description = "The URL of the MCP Cloud Run service"
+  value       = google_cloud_run_v2_service.mcp_service.uri
 }

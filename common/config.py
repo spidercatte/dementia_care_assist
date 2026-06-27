@@ -1,0 +1,47 @@
+import os
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    app_name: str = "DementiaCare Coach API"
+    host: str = "0.0.0.0"
+    port: int = 8000
+
+    gemini_api_key: str = ""
+
+    admin_api_key: str = ""
+    user_api_key: str = ""
+
+    vertex_search_project_id: str = ""
+    vertex_search_location: str = "global"
+    vertex_search_datastore_id: str = ""
+    vertex_patient_datastore_id: str = ""
+
+    chroma_db_path: str = "chroma_db"
+    chroma_server_host: str = ""
+    chroma_server_port: int = 8000
+    db_path: str = "dementia_care.db"
+    database_url: str = ""
+    db_user: str = ""
+    db_password: str = ""
+    db_host: str = ""
+    db_port: int = 5432
+    db_name: str = ""
+    backend_public_url: str = "http://localhost:8000"
+
+    allowed_origins: list[str] = [
+        "http://localhost:5173", "http://127.0.0.1:5173",
+        "http://localhost:5174", "http://127.0.0.1:5174",
+        "http://localhost:5175", "http://127.0.0.1:5175",
+        "http://localhost:5176", "http://127.0.0.1:5176",
+        "http://localhost:3000", "http://127.0.0.1:3000",
+        "https://adk-agent-scaffold-frontend-giva6hsktq-ue.a.run.app",
+        "https://adk-agent-scaffold-frontend-264210343126.us-east1.run.app"
+    ]
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
+settings = Settings()

@@ -8,7 +8,7 @@
   body { font-family: 'Courier New', monospace; background: #f5f5f5; padding: 32px; color: #111; }
   h1 { font-size: 16px; font-weight: bold; text-align: center; margin-bottom: 28px; letter-spacing: 1px; text-transform: uppercase; }
 
-  .canvas { display: flex; flex-direction: column; gap: 20px; max-width: 960px; margin: 0 auto; }
+  .canvas { display: flex; flex-direction: column; gap: 20px; max-width: 1040px; margin: 0 auto; }
 
   /* Row layouts */
   .row { display: flex; gap: 16px; align-items: stretch; }
@@ -80,14 +80,14 @@
   .full { flex: 1; }
 
   /* Agent pipeline */
-  .pipeline { display: flex; align-items: center; gap: 0; }
+  .pipeline { display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
   .agent-box {
     border: 2px solid #222;
     background: #fff;
     padding: 8px 10px;
     font-size: 10px;
     text-align: center;
-    min-width: 90px;
+    min-width: 85px;
   }
   .agent-box .num { font-size: 9px; color: #777; }
   .agent-box .name { font-weight: bold; font-size: 10px; }
@@ -100,8 +100,20 @@
   .box.dark  { background: #222; color: #fff; border-color: #000; }
   .box.dark .label, .box.dark .sub, .box.dark .items { color: #ccc; }
   .box.shade { background: #eee; }
+  .box.mcp { background: #f0f4ff; border-color: #4a6cf7; }
+  .box.mcp .label { color: #4a6cf7; border-bottom-color: #c0ccf8; }
 
   hr.sep { border: none; border-top: 1px dashed #ccc; margin: 4px 0; }
+
+  /* Divider with label */
+  .path-divider {
+    display: flex; align-items: center; gap: 12px; margin: 4px 0;
+    font-size: 9px; font-weight: bold; text-transform: uppercase;
+    letter-spacing: 1px; color: #888;
+  }
+  .path-divider::before, .path-divider::after {
+    content: ""; flex: 1; border-top: 1px dashed #ccc;
+  }
 </style>
 </head>
 <body>
@@ -113,17 +125,21 @@
   <!-- ROW 1: User -->
   <div class="row center">
     <div class="box dark" style="text-align:center; padding: 12px 24px;">
-      <div class="title">👤 Caregiver</div>
+      <div class="title">Caregiver</div>
       <div class="sub">Browser · HTTPS</div>
     </div>
   </div>
 
   <div class="arrow-down">↓ HTTPS</div>
 
-  <!-- ROW 2: Cloud Run Services -->
+  <!-- GCP Cloud boundary -->
   <div class="cloud">
-    <div class="cloud-label">☁️ Google Cloud Platform — Single Project</div>
+    <div class="cloud-label">Google Cloud Platform — Single Project</div>
 
+    <!-- PATH A: Web App -->
+    <div class="path-divider">Web App Path</div>
+
+    <!-- ROW 2: Frontend + Backend + Gemini -->
     <div class="row" style="margin-bottom: 16px;">
       <!-- Frontend -->
       <div class="box full">
@@ -136,38 +152,44 @@
       <div class="connector">
         <span style="font-size:11px; color:#555;">REST API</span>
         <span style="font-size:18px;">→</span>
-        <span style="font-size:9px; color:#555;">/analyze /coach</span>
-        <span style="font-size:9px; color:#555;">/patient /simulator</span>
+        <span style="font-size:9px; color:#555;">/analyze/text</span>
+        <span style="font-size:9px; color:#555;">/analyze/file</span>
+        <span style="font-size:9px; color:#555;">/coach/chat</span>
+        <span style="font-size:9px; color:#555;">/simulator/step</span>
+        <span style="font-size:9px; color:#555;">/patient /translate</span>
       </div>
 
       <!-- Backend -->
       <div class="box full">
         <div class="label">Cloud Run · Backend</div>
-        <div class="title">FastAPI + MCP Server</div>
+        <div class="title">FastAPI</div>
         <div class="sub">Python · port :8000</div>
         <div class="sub">gcr.io/.../backend:latest</div>
+        <hr class="sep" />
+        <div class="sub">Rate limiter · RBAC (X-API-Key)</div>
+        <div class="sub">Uses: common lib</div>
       </div>
 
       <div class="connector">
         <span style="font-size:18px;">→</span>
         <span style="font-size:9px; color:#555;">Inference API</span>
-        <span style="font-size:9px; color:#555;">text + video/audio</span>
+        <span style="font-size:9px; color:#555;">text + file upload</span>
       </div>
 
       <!-- Gemini -->
       <div class="box dashed full">
         <div class="label">External API</div>
         <div class="title">Google Gemini API</div>
-        <div class="sub">gemini-2.0-flash</div>
-        <div class="sub">Multimodal</div>
+        <div class="sub">gemini-2.5-flash</div>
+        <div class="sub">Multimodal (text + file)</div>
       </div>
     </div>
 
-    <div class="arrow-down">↓ orchestrates</div>
+    <div class="arrow-down" style="text-align:left; padding-left: 340px;">↓ orchestrates</div>
 
-    <!-- ROW 3: 5-Agent Pipeline -->
+    <!-- ROW 3: 6-Agent Pipeline -->
     <div class="group" style="margin-bottom: 16px;">
-      <div class="group-label">5-Agent Orchestration Pipeline</div>
+      <div class="group-label">6-Agent Orchestration Pipeline (Backend)</div>
       <div class="pipeline">
         <div class="agent-box">
           <div class="num">①</div>
@@ -201,48 +223,78 @@
       </div>
       <div style="margin-top:10px; display:flex; gap:8px;">
         <div class="agent-box" style="min-width:auto; flex:1;">
-          <div class="name">Conversational Coach Agent</div>
+          <div class="name">Conversational Coach</div>
+          <div class="num">+ Profile Enricher</div>
         </div>
         <div class="agent-box" style="min-width:auto; flex:1;">
           <div class="name">Simulator Agent</div>
-        </div>
-        <div class="agent-box" style="min-width:auto; flex:1;">
-          <div class="name">Profile Enricher Agent</div>
+          <div class="num">patient roleplay</div>
         </div>
       </div>
     </div>
 
-    <!-- ROW 4: Data + Security + Observability -->
+    <!-- PATH B: ADK / MCP -->
+    <div class="path-divider">ADK Agent Path (External Tool Access)</div>
+
+    <!-- ROW 4: ADK Agent → MCP Server -->
+    <div class="row" style="margin-bottom: 16px;">
+      <div class="box dashed full">
+        <div class="label">Vertex AI Reasoning Engine</div>
+        <div class="title">ADK Agent</div>
+        <div class="sub">google-adk framework</div>
+        <div class="sub">1–10 instances</div>
+      </div>
+
+      <div class="connector">
+        <span style="font-size:11px; color:#4a6cf7;">MCP over SSE</span>
+        <span style="font-size:18px;">→</span>
+        <span style="font-size:9px; color:#4a6cf7;">tool requests</span>
+      </div>
+
+      <!-- MCP Server (new separate service) -->
+      <div class="box mcp full">
+        <div class="label">Cloud Run · MCP Server</div>
+        <div class="title">FastMCP (SSE)</div>
+        <div class="sub">Python · port :8002</div>
+        <div class="sub">gcr.io/.../mcp:latest</div>
+        <hr class="sep" />
+        <ul class="items">
+          <li>get_patient_profile</li>
+          <li>log_safety_escalation</li>
+          <li>search_patients</li>
+          <li>query_care_guidelines</li>
+        </ul>
+        <div class="sub" style="margin-top:4px;">Uses: common lib</div>
+      </div>
+
+    </div>
+
+    <!-- ROW 5: Data + Security + Observability -->
     <div class="row" style="gap: 12px;">
 
       <!-- Data Layer -->
       <div class="group full">
-        <div class="group-label">Data Layer</div>
+        <div class="group-label">Shared Data Layer (Backend + MCP)</div>
         <div style="display:flex; flex-direction:column; gap:8px;">
           <div class="box">
             <div class="label">Cloud SQL · PostgreSQL 15</div>
-            <div class="sub">Cloud SQL Auth Proxy · Unix Socket</div>
+            <div class="sub">Cloud SQL Auth Proxy · TCP/Unix Socket</div>
             <ul class="items">
               <li>patients</li>
               <li>interaction_history</li>
               <li>coach_chat_history</li>
               <li>safety_escalations</li>
             </ul>
+            <div class="sub" style="margin-top:4px;">Fallback: SQLite (local dev)</div>
           </div>
           <div class="box">
-            <div class="label">ChromaDB · Vector Store</div>
-            <div class="sub">RAG Retrieval</div>
-            <ul class="items">
-              <li>dementia_guidelines collection</li>
-              <li>20 clinical guideline docs</li>
-            </ul>
-          </div>
-          <div class="box">
-            <div class="label">Vertex AI Search</div>
+            <div class="label">Vertex AI Search · Semantic Search</div>
+            <div class="sub">Discovery Engine API · MCP transport</div>
             <ul class="items">
               <li>dementia-care-guidelines datastore</li>
               <li>dementia-care-patients datastore</li>
             </ul>
+            <div class="sub" style="margin-top:4px;">Local fallback: ChromaDB + DB scan</div>
           </div>
         </div>
       </div>
@@ -270,11 +322,11 @@
             </ul>
           </div>
           <div class="box dashed">
-            <div class="label">Container Registry</div>
-            <div class="sub">GCR</div>
+            <div class="label">Container Registry (GCR)</div>
             <ul class="items">
               <li>frontend:latest</li>
               <li>backend:latest</li>
+              <li>mcp:latest</li>
             </ul>
           </div>
         </div>
@@ -307,17 +359,19 @@
             </ul>
           </div>
           <div class="box dashed">
-            <div class="label">Vertex AI Reasoning Engine</div>
-            <div class="sub">ADK Runtime</div>
+            <div class="label">Common Library</div>
+            <div class="sub">Shared by Backend + MCP</div>
             <ul class="items">
-              <li>1–10 instances</li>
-              <li>google-adk framework</li>
+              <li>config (pydantic-settings)</li>
+              <li>database (pg / sqlite)</li>
+              <li>rag (chromadb)</li>
+              <li>vertex_search</li>
             </ul>
           </div>
         </div>
       </div>
 
-    </div><!-- end row 4 -->
+    </div><!-- end row 5 -->
 
   </div><!-- end GCP cloud -->
 

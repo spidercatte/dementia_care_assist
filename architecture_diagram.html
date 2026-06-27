@@ -111,7 +111,7 @@
 <body>
     <header>
         <h1>Decoupled Architecture Diagram</h1>
-        <p class="subtitle">Visual representation of the 5-service decoupled production stack with FastMCP and SSE connectivity.</p>
+        <p class="subtitle">Production stack: separate FastAPI backend and FastMCP SSE server sharing Cloud SQL and Vertex AI Search. ChromaDB is local-dev fallback only — not deployed in production.</p>
     </header>
 
     <div class="container">
@@ -123,28 +123,34 @@
 
                 subgraph GCP Vertex AI
                     Agent[ADK Agent: Vertex AI Reasoning Engine]
-                    Datastore[Vertex AI Search Datastore]
+                    Datastore[Vertex AI Search Datastores\nguide + patients]
                 end
 
                 subgraph Backend Service Layer
-                    API[Backend API: FastAPI]
-                    MCP[FastMCP Server: /mcp/sse]
-
-                    API --- MCP
+                    API[Backend API: FastAPI\nport 8000\n6-Agent Pipeline + Coach + Simulator]
+                    MCP[MCP Server: FastMCP SSE\nport 8002\nget_patient_profile · log_safety_escalation\nsearch_patients · query_care_guidelines]
                 end
 
-                subgraph Data & RAG Layer
-                    DB[(Database: PostgreSQL / SQLite)]
-                    RAG[(Local RAG: ChromaDB Server / Local Store)]
+                subgraph Data Layer
+                    DB[(Database: PostgreSQL\nCloud SQL — SQLite in local dev)]
+                    VS[Vertex AI Search\nguide + patient datastores\nDiscovery Engine MCP transport]
                 end
 
-                %% Communications
-                UI -->|HTTP Requests| API
-                Agent -->|1. Tool Requests: MCP Client over SSE| MCP
-                Agent -->|2. Native RAG Search| Datastore
-                MCP -->|Queries Patient Data| DB
-                API -->|Queries Patient Data| DB
-                API -->|Queries Guidelines| RAG
+                %% Web App path
+                UI -->|HTTPS REST Requests| API
+                API -->|Gemini 2.5-flash inference| GeminiAPI[Google Gemini API]
+
+                %% ADK Agent path
+                Agent -->|MCP over SSE: tool calls| MCP
+                Agent -->|Native search| Datastore
+
+                %% Shared data access
+                MCP -->|Query / write patient data & escalations| DB
+                MCP -->|Semantic search: guidelines + patients| VS
+                API -->|Query / write patient data & history| DB
+                API -->|Semantic search: care guidelines| VS
+
+                %% Note: ChromaDB used locally as fallback only (not deployed in prod)
         </div>
     </div>
 

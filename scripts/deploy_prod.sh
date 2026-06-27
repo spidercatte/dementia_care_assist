@@ -79,19 +79,55 @@ cp "$WORKSPACE_DIR/adk-agent-scaffold/deployment/terraform/production.tf" "$TERR
 # Replace var.prod_project_id with var.project_id in single-project production.tf
 sed -i '' 's/var.prod_project_id/var.project_id/g' "$TERRAFORM_DIR/production.tf"
 
-# 6. Build and push the Backend Docker image
-echo "--> Building Backend Docker Image..."
-docker build -t "gcr.io/$PROJECT_ID/$PROJECT_NAME-backend:latest" "$WORKSPACE_DIR/backend"
+# 6. Build and push the Backend & MCP Docker images via Cloud Build
+echo "--> Creating temporary Cloud Build config for Backend..."
+cat <<'EOF' > "$WORKSPACE_DIR/backend_cloudbuild.yaml"
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-f', 'backend/Dockerfile',
+      '-t', 'gcr.io/$_PROJECT_ID/$_PROJECT_NAME-backend:latest',
+      '.'
+    ]
+images:
+  - 'gcr.io/$_PROJECT_ID/$_PROJECT_NAME-backend:latest'
+EOF
 
-echo "--> Pushing Backend Docker Image to GCR..."
-docker push "gcr.io/$PROJECT_ID/$PROJECT_NAME-backend:latest"
+echo "--> Building Backend Docker Image via Cloud Build..."
+gcloud builds submit \
+    --config="$WORKSPACE_DIR/backend_cloudbuild.yaml" \
+    --substitutions=_PROJECT_ID="$PROJECT_ID",_PROJECT_NAME="$PROJECT_NAME" \
+    "$WORKSPACE_DIR"
+rm "$WORKSPACE_DIR/backend_cloudbuild.yaml"
 
-# 7. Initialize Terraform and Deploy Backend/PostgreSQL to retrieve URL
-echo "--> Bootstrapping Terraform database & backend..."
+echo "--> Creating temporary Cloud Build config for MCP..."
+cat <<'EOF' > "$WORKSPACE_DIR/mcp_cloudbuild.yaml"
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-f', 'mcp_server/Dockerfile',
+      '-t', 'gcr.io/$_PROJECT_ID/$_PROJECT_NAME-mcp:latest',
+      '.'
+    ]
+images:
+  - 'gcr.io/$_PROJECT_ID/$_PROJECT_NAME-mcp:latest'
+EOF
+
+echo "--> Building MCP Server Docker Image via Cloud Build..."
+gcloud builds submit \
+    --config="$WORKSPACE_DIR/mcp_cloudbuild.yaml" \
+    --substitutions=_PROJECT_ID="$PROJECT_ID",_PROJECT_NAME="$PROJECT_NAME" \
+    "$WORKSPACE_DIR"
+rm "$WORKSPACE_DIR/mcp_cloudbuild.yaml"
+
+# 7. Initialize Terraform and Deploy Backend/MCP/PostgreSQL to retrieve URL
+echo "--> Bootstrapping Terraform database, backend & mcp..."
 cd "$TERRAFORM_DIR"
 terraform init
 
-echo "--> Applying PostgreSQL and Backend Cloud Run configurations..."
+echo "--> Applying PostgreSQL, Backend, and MCP Cloud Run configurations..."
 terraform apply \
     -target=google_service_account.app_sa \
     -target=google_project_iam_member.app_sa_roles \
@@ -104,27 +140,42 @@ terraform apply \
     -target=google_secret_manager_secret_version.admin_api_key_version \
     -target=google_secret_manager_secret_version.db_password_version \
     -target=google_cloud_run_v2_service.backend_service \
+    -target=google_cloud_run_v2_service.mcp_service \
     -var="gemini_api_key=$GEMINI_API_KEY" \
     -var="user_api_key=$USER_API_KEY" \
     -var="admin_api_key=$ADMIN_API_KEY" \
     -var-file=vars/env.tfvars \
     -auto-approve
 
-# Retrieve the active Backend URL from Terraform outputs
-echo "--> Retrieving Backend API URL..."
+# Retrieve the active Backend and MCP URLs from Terraform outputs
+echo "--> Retrieving Service URLs..."
 BACKEND_URL=$(terraform output -raw backend_url)
+MCP_URL=$(terraform output -raw mcp_url)
 echo "    Backend URL resolved to: $BACKEND_URL"
+echo "    MCP URL resolved to:     $MCP_URL"
 
-# 8. Build and push the Frontend Docker image using the Backend URL and User API Key
-echo "--> Building Frontend Docker Image with Backend URL: $BACKEND_URL..."
-docker build \
-    --build-arg VITE_BACKEND_URL="$BACKEND_URL" \
-    --build-arg VITE_USER_API_KEY="$USER_API_KEY" \
-    -t "gcr.io/$PROJECT_ID/$PROJECT_NAME-frontend:latest" \
+# 8. Build and push the Frontend Docker image using the Backend URL and User API Key via Cloud Build
+echo "--> Creating temporary Cloud Build config for Frontend..."
+cat <<'EOF' > "$WORKSPACE_DIR/frontend/frontend_cloudbuild.yaml"
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-t', 'gcr.io/$_PROJECT_ID/$_PROJECT_NAME-frontend:latest',
+      '--build-arg', 'VITE_BACKEND_URL=$_VITE_BACKEND_URL',
+      '--build-arg', 'VITE_USER_API_KEY=$_VITE_USER_API_KEY',
+      '.'
+    ]
+images:
+  - 'gcr.io/$_PROJECT_ID/$_PROJECT_NAME-frontend:latest'
+EOF
+
+echo "--> Building Frontend Docker Image via Cloud Build with Backend URL: $BACKEND_URL..."
+gcloud builds submit \
+    --config="$WORKSPACE_DIR/frontend/frontend_cloudbuild.yaml" \
+    --substitutions=_PROJECT_ID="$PROJECT_ID",_PROJECT_NAME="$PROJECT_NAME",_VITE_BACKEND_URL="$BACKEND_URL",_VITE_USER_API_KEY="$USER_API_KEY" \
     "$WORKSPACE_DIR/frontend"
-
-echo "--> Pushing Frontend Docker Image to GCR..."
-docker push "gcr.io/$PROJECT_ID/$PROJECT_NAME-frontend:latest"
+rm "$WORKSPACE_DIR/frontend/frontend_cloudbuild.yaml"
 
 # 9. Complete full Terraform Apply
 echo "--> Finalizing deployment of all services (including Frontend Cloud Run)..."
@@ -140,14 +191,15 @@ FRONTEND_URL=$(terraform output -raw frontend_url)
 # 10. Deploy the ADK Agent (Vertex AI Reasoning Engine)
 echo "--> Deploying ADK Agent to Vertex AI Reasoning Engine..."
 cd "$WORKSPACE_DIR/adk-agent-scaffold"
-# Set environment variable BACKEND_URL for the deployed agent
-export BACKEND_URL="$BACKEND_URL"
+# Set environment variable BACKEND_URL for the deployed agent to the MCP Server URL
+export BACKEND_URL="$MCP_URL"
 agents-cli deploy --no-confirm-project
 
 echo ""
 echo "=== Deployment Completed Successfully! ==="
 echo "    Frontend URL:      $FRONTEND_URL"
 echo "    Backend URL:       $BACKEND_URL"
+echo "    MCP URL:           $MCP_URL"
 echo "    User Access Key:   $USER_API_KEY"
 echo "    Admin Access Key:  $ADMIN_API_KEY"
 echo "=========================================================================="

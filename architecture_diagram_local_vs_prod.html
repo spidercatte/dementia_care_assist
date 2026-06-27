@@ -128,22 +128,23 @@
 <body>
     <header>
         <h1>Local vs Production Decoupled Architectures</h1>
-        <p class="subtitle">Comparing the offline multi-container configuration with the cloud serverless/managed Google Cloud stack.</p>
+        <p class="subtitle">Comparing the 5-container Docker Compose development setup with the decoupled Google Cloud production stack, highlighting the separate Backend API and MCP Server services.</p>
     </header>
 
     <div class="grid">
         <!-- Local Development Card -->
         <div class="card">
             <h2>Local Development (Docker Compose)</h2>
-            <p class="desc">The Web App runs all agent logic locally. A separate ADK Agent Playground can be run locally for testing, connecting to FastMCP over SSE.</p>
+            <p class="desc">Five containers in a shared Docker Compose network. Backend (port 8000) and MCP Server (port 8002) are separate services, both sharing PostgreSQL and ChromaDB via the common library.</p>
             <div class="mermaid">
                 graph TD
                     subgraph User Host
                         subgraph docker-compose [Docker Compose Network]
-                            UI[Frontend UI: Port 80]
-                            API[Backend API & FastMCP: Port 8000]
-                            DB[(Local SQLite DB)]
-                            RAG[(Local ChromaDB)]
+                            UI[Frontend UI\nPort 80]
+                            API[Backend API: FastAPI\nPort 8000\n6-Agent Pipeline]
+                            MCP[MCP Server: FastMCP SSE\nPort 8002\n4 MCP tools]
+                            DB[(PostgreSQL 15\nPort 5432)]
+                            RAG[(ChromaDB\nPort 8001)]
                         end
 
                         Playground[ADK Agent: Local Playground]
@@ -151,45 +152,52 @@
 
                     %% Web App Flow
                     UI -->|1. HTTP Requests| API
-                    API -->|2. Local Agent Orchestration| API
-                    API -->|3. Query Patient Profiles| DB
+                    API -->|2. Agent Orchestration + Gemini| API
+                    API -->|3. Query Patient Data| DB
                     API -->|4. Query Care Guidelines| RAG
 
-                    %% Agent Playground Flow
-                    Playground -.->|MCP SSE Requests| API
+                    %% MCP Flow
+                    Playground -.->|MCP SSE Requests| MCP
+                    MCP -->|Query / Write Patient Data| DB
+                    MCP -->|Query Care Guidelines| RAG
             </div>
         </div>
 
         <!-- Production Cloud Card -->
         <div class="card">
             <h2>Production Environment (Google Cloud)</h2>
-            <p class="desc">Decoupled 5-service cloud stack. The Backend API invokes the Agent (Reasoning Engine), which queries the Datastore natively and pulls DB records via FastMCP SSE.</p>
+            <p class="desc">Decoupled cloud stack. Backend API and MCP Server are separate Cloud Run services sharing Cloud SQL and Vertex AI Search. No ChromaDB in production — Vertex AI Search handles all semantic search.</p>
             <div class="mermaid">
                 graph TD
                     subgraph "Google Cloud Platform (GCP)"
                         subgraph Client Facing Services
-                            UI[Frontend UI: Cloud Run]
-                            API[Backend API & FastMCP: Cloud Run]
+                            UI[Frontend UI\nCloud Run · port 80]
+                            API[Backend API: FastAPI\nCloud Run · port 8000]
+                            MCP[MCP Server: FastMCP SSE\nCloud Run · port 8002]
                         end
 
                         subgraph Vertex AI Layer
-                            Agent[ADK Agent: Reasoning Engine]
-                            Datastore[Vertex AI Search Datastore]
+                            Agent[ADK Agent\nReasoning Engine]
+                            Datastore[Vertex AI Search\nguide + patient datastores]
                         end
 
                         subgraph Stateful Managed Services
-                            DB[(Cloud SQL: PostgreSQL)]
-                            RAG[(ChromaDB: Standalone Cloud Run)]
+                            DB[(Cloud SQL: PostgreSQL 15\nCloud SQL Auth Proxy)]
+                            VS[Vertex AI Search\nguide + patient datastores]
                         end
                     end
 
-                    %% Communications
+                    %% Web App path
                     UI -->|1. HTTPS Requests| API
-                    API -->|2. Invoke Agent: Vertex AI SDK| Agent
-                    Agent -->|3. MCP SSE Tool Call| API
-                    Agent -->|4. Native RAG Search| Datastore
-                    API -->|5. Query DB via Cloud SQL Auth Proxy| DB
-                    API -->|6. Query Guidelines (UI Library/Seed)| RAG
+                    API -->|2. Gemini 2.5-flash inference| GeminiAPI[Google Gemini API]
+                    API -->|3. Query / write patient data| DB
+                    API -->|4. Semantic search: guidelines| VS
+
+                    %% ADK Agent path
+                    Agent -->|5. MCP SSE Tool Calls| MCP
+                    Agent -->|6. Native search| Datastore
+                    MCP -->|7. Query / write DB| DB
+                    MCP -->|8. Semantic search: guidelines + patients| VS
             </div>
         </div>
     </div>

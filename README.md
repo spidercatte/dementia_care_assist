@@ -34,12 +34,12 @@ DementiaCare Coach is a multi-modal AI agent that:
 | Concept | Where |
 |---|---|
 | **Multi-agent system (ADK)** | `adk-agent-scaffold/app/agent.py` — ADK conversational coach; `backend/app/agents/` — 7-agent pipeline |
-| **MCP Server** | `backend/app/mcp_server.py` — FastMCP over SSE, consumed by the ADK agent |
+| **MCP Server** | `mcp_server/app/mcp_server.py` — standalone FastMCP service over SSE on port 8002, consumed by the ADK agent |
 | **Human-in-the-Loop (HITL)** | `ProfileEnricherAgent` detects new triggers/preferences from coach conversations; surfaces them to the caregiver for approval before updating the patient profile |
 | **Security features** | `backend/app/main.py` — API key auth (`X-API-Key`), rate limiting (60 req/min/IP), CORS |
-| **Deployability** | `docker-compose.yaml` — 4-service stack (PostgreSQL, ChromaDB, FastAPI backend, React frontend) |
+| **Deployability** | `docker-compose.yaml` — 5-service stack (PostgreSQL, ChromaDB, FastAPI backend, standalone MCP server, React frontend); Cloud Run deployment scripts |
 | **Antigravity** | See video demo |
-| **RAG** | `backend/app/rag.py` — ChromaDB + Gemini `text-embedding-004`; `backend/data/rag/guidelines/` |
+| **RAG** | `common/rag.py` — ChromaDB + Gemini `text-embedding-004`; `common/vertex_search.py` — Vertex AI Search (production); `backend/data/rag/guidelines/` |
 
 ---
 
@@ -52,7 +52,7 @@ DementiaCare Coach is a multi-modal AI agent that:
 └──────────────────────┬──────────────────────────────────────────┘
                        │ REST (VITE_BACKEND_URL)
 ┌──────────────────────▼──────────────────────────────────────────┐
-│                    FastAPI Backend                               │
+│                 FastAPI Backend  :8000                           │
 │                                                                 │
 │   /analyze/text   /analyze/file   /simulator/step   /coach/chat  │
 │   /patient/{name}/interactions   /patient/{name}/coach-chat      │
@@ -65,23 +65,28 @@ DementiaCare Coach is a multi-modal AI agent that:
 │  │  Step 0: ValidationService   │                              │
 │  │  Step 1: InteractionAnalyzer │◄── Gemini File API           │
 │  │  Step 2: PatientContext      │    (video/audio upload)      │
-│  │     RAG: ChromaDB query ─────┼──► ChromaDB (guidelines)     │
+│  │     RAG: Vertex AI Search ───┼──► Vertex AI Search (prod)   │
+│  │          └─ ChromaDB fallback┼──► ChromaDB :8001 (local)   │
 │  │  Step 3: CareGuidanceService │                              │
 │  │  Step 4: SafetyEvaluator     │                              │
 │  │  Step 5: CoachingSynthesizer │                              │
 │  └──────────────────────────────┘                              │
-│                                                                 │
-│   /mcp/sse  ◄─── FastMCP Server (MCP over SSE)                  │
-│                  tools: get_patient_profile                     │
-│                          log_safety_escalation (→ DB)          │
-│                          query_care_guidelines (→ ChromaDB)    │
+└─────────────────────────────────────────────────────────────────┘
+                        │ MCP SSE (:8002)
+┌───────────────────────▼─────────────────────────────────────────┐
+│              MCP Server (mcp_server/)  :8002                    │
+│   FastMCP over SSE — standalone service                         │
+│   tools: get_patient_profile    (→ PostgreSQL)                  │
+│           log_safety_escalation (→ PostgreSQL)                  │
+│           search_patients       (→ Vertex AI Search / DB)       │
+│           query_care_guidelines (→ Vertex AI Search / ChromaDB) │
 └───────────────────────┬─────────────────────────────────────────┘
                         │ MCP SSE
 ┌───────────────────────▼─────────────────────────────────────────┐
 │              ADK Agent Scaffold (adk-agent-scaffold/)           │
 │   google.adk.agents.Agent — conversational dementia coach       │
 │   Tools: get_patient_profile | log_safety_escalation |          │
-│           query_care_guidelines                                 │
+│           search_patients | query_care_guidelines               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -105,7 +110,7 @@ Each step is a dedicated Gemini agent with a narrow system prompt and an enforce
 | 0 | `ValidationService` | `ValidationResponse` | Reject noise (silence, unrelated media, greetings) before spending tokens |
 | 1 | `InteractionAnalyzer` | `InteractionAnalysisResponse` | Extract behavior, agitation level, behavioral timeline, RAG query keyword |
 | 2 | `PatientContextProcessor` | `PatientContextResponse` | Map patient history & known triggers against what was observed |
-| RAG | ChromaDB | — | Retrieve top-2 clinical guidelines matching Step 1's `rag_query` |
+| RAG | Vertex AI Search (prod) / ChromaDB (local) | — | Retrieve top-2 clinical guidelines matching Step 1's `rag_query` |
 | 3 | `CareGuidanceService` | `CareGuidanceResponse` | Synthesize RAG results into clinical recommendations & do-not lists |
 | 4 | `SafetyEvaluator` | `SafetyEscalationResponse` | Dedicated safety pass — never buried in coaching output |
 | 5 | `CoachingSynthesizer` | `FinalCoachingResponse` | Assemble full coaching response with scripts, strengths, recommendations |
@@ -189,8 +194,9 @@ docker-compose up --build
 
 This starts:
 - `db` — PostgreSQL 15 (patient data, safety escalation logs)
-- `rag` — ChromaDB 0.4.24 (clinical guidelines vector store)
-- `backend` — FastAPI + FastMCP server
+- `rag` — ChromaDB 0.4.24 (clinical guidelines vector store, port 8001)
+- `backend` — FastAPI backend (port 8000)
+- `mcp` — standalone FastMCP server over SSE (port 8002)
 - `frontend` — React app served via Nginx on port 80
 
 Access the app at `http://localhost`.
@@ -199,19 +205,22 @@ Access the app at `http://localhost`.
 
 ### Option C: ADK Agent Scaffold (conversational agent)
 
-The ADK agent connects to the backend via MCP over SSE for conversational caregiver coaching.
+The ADK agent connects to the standalone MCP server via MCP over SSE for conversational caregiver coaching.
 
 ```bash
 cd adk-agent-scaffold
 pip install -r requirements.txt   # or: uv sync
 
-export BACKEND_URL=http://localhost:8000
+# Point to the standalone MCP service (port 8002); agent appends /mcp/sse
+export BACKEND_URL=http://localhost:8002
 # For Vertex AI:
 export GOOGLE_GENAI_USE_VERTEXAI=True
 export GOOGLE_CLOUD_PROJECT=your-project-id
 
 adk run app
 ```
+
+> The MCP server must be running before starting the ADK agent. Start it with `docker-compose up mcp` or run `mcp_server/` directly.
 
 ---
 
@@ -225,6 +234,10 @@ adk run app
 | `DATABASE_URL` | Docker only | PostgreSQL connection string |
 | `CHROMA_SERVER_HOST` | Docker only | ChromaDB host (default: local PersistentClient) |
 | `CHROMA_SERVER_PORT` | Docker only | ChromaDB port |
+| `VERTEX_SEARCH_PROJECT_ID` | Production only | GCP project ID for Vertex AI Search |
+| `VERTEX_SEARCH_LOCATION` | Production only | Vertex AI Search location (default: `global`) |
+| `VERTEX_SEARCH_DATASTORE_ID` | Production only | Datastore ID for clinical guidelines |
+| `VERTEX_PATIENT_DATASTORE_ID` | Production only | Datastore ID for patient records |
 
 Leave `GEMINI_API_KEY` blank to run in **MOCK mode** — the app returns high-fidelity local responses for the three most common dementia scenarios (medication refusal, shower resistance, wanting to go home).
 
@@ -262,6 +275,11 @@ Each skill is self-contained with a `SKILL.md` that describes its steps and purp
 ```
 dementia_care/
 ├── .agents/               # Antigravity skills, hooks, and scripts (see above)
+├── common/                # Shared library used by backend and mcp_server
+│   ├── config.py          # Pydantic settings (single source of truth)
+│   ├── database.py        # SQLite / PostgreSQL client
+│   ├── rag.py             # ChromaDB + Gemini embeddings
+│   └── vertex_search.py   # Vertex AI Search client (production retrieval)
 ├── backend/
 │   ├── app/
 │   │   ├── agents/
@@ -276,21 +294,27 @@ dementia_care/
 │   │   │   ├── conversational_coach.py  # Follow-up chat agent
 │   │   │   └── profile_enricher.py      # Step 6: HITL profile enrichment suggestions
 │   │   ├── main.py                      # FastAPI routes + auth + rate limiting
-│   │   ├── mcp_server.py                # FastMCP tools (MCP over SSE)
-│   │   ├── rag.py                       # ChromaDB + Gemini embeddings
+│   │   ├── rag.py                       # Re-exports from common/rag.py
+│   │   ├── vertex_search.py             # Re-exports from common/vertex_search.py
 │   │   ├── schemas.py                   # Pydantic output schemas (all agents)
-│   │   ├── database.py                  # SQLite / PostgreSQL client
-│   │   └── config.py                    # Pydantic settings
+│   │   ├── database.py                  # Re-exports from common/database.py
+│   │   └── config.py                    # Re-exports from common/config.py
 │   ├── data/
 │   │   └── rag/guidelines/              # Clinical protocol markdown files
 │   ├── tests/                           # Per-agent eval tests + API tests
+│   └── requirements.txt
+├── mcp_server/                          # Standalone MCP service (port 8002)
+│   ├── app/
+│   │   └── mcp_server.py               # FastMCP tools over SSE
+│   ├── Dockerfile
 │   └── requirements.txt
 ├── frontend/
 │   └── src/
 │       └── App.jsx                      # React SPA
 ├── adk-agent-scaffold/
 │   └── app/
-│       └── agent.py                     # ADK agent + MCP tool wrappers
+│       ├── agent.py                     # ADK agent + MCP tool wrappers
+│       └── dementia_care_workflow.py    # ADK Workflow graph (pipeline alternative)
 ├── docker-compose.yaml
 └── threat_model.md
 ```

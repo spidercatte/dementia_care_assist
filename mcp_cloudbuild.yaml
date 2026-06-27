@@ -1,0 +1,10 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-f', 'mcp_server/Dockerfile',
+      '-t', 'gcr.io/$_PROJECT_ID/$_PROJECT_NAME-mcp:latest',
+      '.'
+    ]
+images:
+  - 'gcr.io/$_PROJECT_ID/$_PROJECT_NAME-mcp:latest'

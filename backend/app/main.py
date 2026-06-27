@@ -94,15 +94,12 @@ app.add_middleware(
 @app.middleware("http")
 async def rate_limiting_middleware(request: Request, call_next):
     client_ip = request.client.host if request.client else "unknown"
-    if request.url.path != "/health" and not request.url.path.startswith("/mcp") and not rate_limiter.is_allowed(client_ip):
+    if request.url.path != "/health" and not rate_limiter.is_allowed(client_ip):
         return JSONResponse(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             content={"detail": "Too many requests. Please try again later."}
         )
     return await call_next(request)
-
-from app.mcp_server import mcp
-app.mount("/mcp", mcp.sse_app())
 
 # Instantiate orchestrator and simulator agents
 orchestrator = OrchestratorAgent()
