@@ -27,7 +27,8 @@ import {
   Volume2,
   Circle,
   Sun,
-  Moon
+  Moon,
+  LogOut
 } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
@@ -203,6 +204,7 @@ function App() {
       const res = await fetch(url, { ...options, headers });
       if (res.status === 401) {
         console.error('API request returned 401 Unauthorized.');
+        setIsAuthenticated(false);
       }
       return res;
     } catch (err) {
@@ -1382,6 +1384,7 @@ function App() {
             {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
           </button>
 
+
           <div className="api-status">
             <span className={`status-dot ${backendStatus === 'online' ? 'online' : backendStatus === 'offline' ? 'offline' : ''}`}></span>
             <span>Care Coach: {backendStatus.toUpperCase()}</span>
@@ -1458,6 +1461,25 @@ function App() {
                   <RefreshCw size={13} />
                   New Session
                 </button>
+              </div>
+
+              <div style={{
+                fontSize: '0.75rem',
+                color: 'var(--text-muted)',
+                background: 'rgba(6, 182, 212, 0.05)',
+                border: '1px solid rgba(6, 182, 212, 0.15)',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                marginBottom: '1.25rem',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.5rem',
+                lineHeight: '1.4'
+              }}>
+                <Info size={14} style={{ flexShrink: 0, marginTop: '2px', color: 'var(--primary)' }} />
+                <span>
+                  <strong>Coaching Aid Notice:</strong> This is a coaching assistant to help you learn communication skills. It does <strong>not</strong> provide medical or clinical advice. In a crisis, prioritize safety and call emergency services or a physician.
+                </span>
               </div>
 
               <div className="form-group">
@@ -1970,6 +1992,22 @@ function App() {
                               );
                             })}
                           </div>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--text-muted)',
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '0.4rem',
+                            borderTop: '1px solid var(--border-color)',
+                            paddingTop: '0.75rem',
+                            marginTop: '0.75rem',
+                            lineHeight: '1.4'
+                          }}>
+                            <Info size={13} style={{ marginTop: '2px', flexShrink: 0, color: 'var(--secondary)' }} />
+                            <span>
+                              <strong>Coaching Notice:</strong> Dialogue scripts are AI-generated based on clinical care guidelines. They are intended as educational suggestions and must be adapted to your unique situation. AI phrasing may not resolve agitation and is not a clinical replacement.
+                            </span>
+                          </div>
                         </div>
 
                         {/* Clinical Recommendations */}
@@ -2459,6 +2497,25 @@ function App() {
                 Select a scenario. The simulated patient agent ({patient.name}) will respond realistically. Practice validation therapy and redirection to keep their agitation low.
               </p>
 
+              <div style={{
+                fontSize: '0.75rem',
+                color: 'var(--text-muted)',
+                background: 'rgba(6, 182, 212, 0.05)',
+                border: '1px solid rgba(6, 182, 212, 0.15)',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.5rem',
+                lineHeight: '1.4'
+              }}>
+                <Info size={14} style={{ flexShrink: 0, marginTop: '2px', color: 'var(--primary)' }} />
+                <span>
+                  <strong>Coaching Aid Notice:</strong> This simulator is an educational sandbox utilizing AI agents to help caregivers practice communication techniques. Real-world responses will vary. If a patient is aggressive or in distress, prioritize their physical safety and consult a clinician.
+                </span>
+              </div>
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {MOCK_SCENARIOS.map((scen) => (
                   <div
@@ -2634,6 +2691,29 @@ function App() {
           </div>
         )}
       </main>
+      <footer className="app-footer" style={{
+        marginTop: '3rem',
+        padding: '2rem 1.5rem',
+        borderTop: '1px solid var(--border-color)',
+        textAlign: 'center',
+        fontSize: '0.8rem',
+        color: 'var(--text-muted)',
+        background: 'var(--bg-card)',
+        lineHeight: '1.6'
+      }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
+            <Info size={16} style={{ color: 'var(--secondary)' }} />
+            Clinical Liability & Safety Disclaimer
+          </div>
+          <p style={{ margin: 0 }}>
+            DementiaCare Coach is an AI-powered educational coaching tool designed to help caregivers learn evidence-based communication techniques. It is <strong>not</strong> a clinical diagnostic tool, medical device, or replacement for professional medical advice, clinical diagnosis, treatment, or crisis intervention.
+          </p>
+          <p style={{ margin: 0, fontSize: '0.75rem', opacity: 0.9 }}>
+            Caregivers assume all accountability and risk for applying dialogue suggestions ("Try saying / Avoid saying") in real-world scenarios. In a medical crisis, physical danger, aggression, or emergency, prioritize safety and immediately contact emergency services (911) or a licensed medical professional.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
