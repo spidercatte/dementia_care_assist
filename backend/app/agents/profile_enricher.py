@@ -37,12 +37,17 @@ class ProfileEnricherAgent:
             f"- Existing Triggers: [{existing_triggers}]\n"
             f"- Existing Preferences: [{existing_preferences}]\n\n"
             "Here is the chat history between the Caregiver and the Coach:\n"
-            f"{formatted_history}\n"
+            f"{formatted_history}\n\n"
             "Instructions:\n"
             "1. Extract ONLY new triggers and new preferences that are NOT already listed in the existing ones above.\n"
             "2. Make the extracted triggers/preferences short, clear, and actionable (e.g. 'direct commands', 'cold rooms' as triggers; 'Big Band music', 'warm tea' as preferences).\n"
             "3. Do not include generic advice or coach suggestions unless the caregiver confirmed they work.\n"
-            "4. Return strictly matching the required JSON schema."
+            "4. For each extracted new trigger and preference, populate 'new_triggers_details' and 'new_preferences_details' with:\n"
+            "   - name: The trigger/preference name.\n"
+            "   - status: Always 'suspected' since it is an AI suggestion.\n"
+            "   - confidence: A score from 0.0 to 1.0 based on how strongly/explicitly verified it is in the chat conversation.\n"
+            "   - source: A short snippet of caregiver evidence proving this (e.g., \"Caregiver: she loves tea\").\n"
+            "5. Respond strictly in the required JSON schema."
         )
 
         try:

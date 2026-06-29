@@ -22,6 +22,18 @@ class InteractionAnalysisResponse(BaseModel):
     behavioral_timeline: List[BehavioralObservation] = Field(description="Chronological timeline of behavioral observations")
     detected_language: str = Field(description="The language used in the interaction, e.g., 'English', 'Tagalog', 'Spanish', etc.")
 
+class TriggerDetail(BaseModel):
+    name: str = Field(description="Name of the trigger")
+    status: str = Field(description="status: 'confirmed' or 'suspected'")
+    confidence: float = Field(description="confidence score 0.0 to 1.0")
+    source: str = Field(description="origin or source of the trigger")
+
+class PreferenceDetail(BaseModel):
+    name: str = Field(description="Name of the preference")
+    status: str = Field(description="status: 'confirmed' or 'suspected'")
+    confidence: float = Field(description="confidence score 0.0 to 1.0")
+    source: str = Field(description="origin or source of the preference")
+
 # ==========================================
 # 2. Patient Context Agent Schema
 # ==========================================
@@ -31,6 +43,9 @@ class PatientContextResponse(BaseModel):
     preferences: List[str] = Field(description="Comfort habits, likes, or tools they respond well to")
     daily_routine_constraints: List[str] = Field(description="Routines, timings, or schedules to keep in mind")
     health_risk_factors: List[str] = Field(description="Relevant health concerns (diabetes, pain, sleep patterns)")
+    trigger_details: List[TriggerDetail] = Field(default=[], description="Detailed active triggers with confidence and status")
+    preference_details: List[PreferenceDetail] = Field(default=[], description="Detailed active preferences with confidence and status")
+    bias_warning_note: Optional[str] = Field(None, description="Warning note about potential biases, conflicts, or unconfirmed triggers")
 
 # ==========================================
 # 3. Care Guidance Agent Schema
@@ -85,6 +100,11 @@ class FinalCoachingResponse(BaseModel):
     # Dynamic Profile Enrichment Suggestions
     suggested_triggers: Optional[List[str]] = Field(default=None, description="Suggested new triggers to add to the patient profile")
     suggested_preferences: Optional[List[str]] = Field(default=None, description="Suggested new preferences to add to the patient profile")
+    bias_warning_note: Optional[str] = Field(None, description="Warning note about potential biases, conflicts, or unconfirmed triggers")
+    trigger_details: Optional[List[TriggerDetail]] = Field(default=None, description="Detailed active patient triggers")
+    preference_details: Optional[List[PreferenceDetail]] = Field(default=None, description="Detailed active patient preferences")
+    suggested_triggers_details: Optional[List[TriggerDetail]] = Field(default=None, description="Suggested new triggers with metadata")
+    suggested_preferences_details: Optional[List[PreferenceDetail]] = Field(default=None, description="Suggested new preferences with metadata")
 
 # ==========================================
 # 6. Translation Request Schema
@@ -107,3 +127,5 @@ class ValidationResponse(BaseModel):
 class ProfileEnricherResponse(BaseModel):
     new_triggers: List[str] = Field(default=[], description="New potential triggers discovered in the dialogue")
     new_preferences: List[str] = Field(default=[], description="New potential comfort habits, routines, or items discovered")
+    new_triggers_details: List[TriggerDetail] = Field(default=[], description="Detailed new potential triggers with confidence and status")
+    new_preferences_details: List[PreferenceDetail] = Field(default=[], description="Detailed new potential preferences with confidence and status")

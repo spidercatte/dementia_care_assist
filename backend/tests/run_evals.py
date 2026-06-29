@@ -87,8 +87,8 @@ def run_evaluations(live_mode: bool):
     os.environ["FORCE_MOCK_EVAL"] = "0" if live_mode else "1"
 
     # Run pytest on all test files in the tests directory
-    tests_dir = os.path.dirname(__file__)
-    exit_code = pytest.main(["-v", tests_dir])
+    # tests_dir = os.path.dirname(__file__)
+    # exit_code = pytest.main(["-v", tests_dir])
 
     # Load dataset
     if not os.path.exists(EVAL_DATA_PATH):

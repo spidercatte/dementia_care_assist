@@ -191,9 +191,6 @@ function App() {
   const [apiKey, setApiKey] = useState(() => {
     return localStorage.getItem('user_api_key') || DEFAULT_USER_API_KEY;
   });
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
-  const [loginInput, setLoginInput] = useState('');
-  const [loginError, setLoginError] = useState('');
 
   const secureFetch = async (url, options = {}) => {
     const headers = {
@@ -204,45 +201,11 @@ function App() {
       const res = await fetch(url, { ...options, headers });
       if (res.status === 401) {
         console.error('API request returned 401 Unauthorized.');
-        setIsAuthenticated(false);
       }
       return res;
     } catch (err) {
       throw err;
     }
-  };
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoginError('');
-    if (!loginInput.trim()) {
-      setLoginError('Please enter an Access Key.');
-      return;
-    }
-
-    try {
-      const testHeaders = { 'X-API-Key': loginInput.trim() };
-      const res = await fetch(`${BACKEND_URL}/patients`, { headers: testHeaders });
-      if (res.ok) {
-        localStorage.setItem('user_api_key', loginInput.trim());
-        setApiKey(loginInput.trim());
-        setIsAuthenticated(true);
-        setLoginInput('');
-        setLoginError('');
-        // Reload data
-        loadPatientData();
-      } else {
-        setLoginError('Invalid Access Key. Access denied.');
-      }
-    } catch (err) {
-      setLoginError('Connection failed: ' + err.message);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('user_api_key');
-    setApiKey('');
-    setIsAuthenticated(false);
   };
 
   // Patient Profile State
@@ -506,15 +469,34 @@ function App() {
     }
   };
 
-  const handleApplySuggestedUpdate = async (type, value) => {
+  const handleApplySuggestedUpdate = async (type, value, status = 'confirmed') => {
     if (!value) return;
     let updatedPatient = { ...patient };
+
+    // Find matching details if available
+    const detailsList = type === 'trigger' ? suggestedUpdates?.triggerDetails : suggestedUpdates?.preferenceDetails;
+    const itemDetail = detailsList?.find(x => x.name === value) || {
+      name: value,
+      status: status,
+      confidence: 1.0,
+      source: 'AI Suggestion'
+    };
+    itemDetail.status = status;
+
     if (type === 'trigger') {
       if (patient.triggers.includes(value)) return;
       updatedPatient.triggers = [...patient.triggers, value];
+      updatedPatient.trigger_metadata = {
+        ...(patient.trigger_metadata || {}),
+        [value]: itemDetail
+      };
     } else if (type === 'preference') {
       if (patient.preferences.includes(value)) return;
       updatedPatient.preferences = [...patient.preferences, value];
+      updatedPatient.preference_metadata = {
+        ...(patient.preference_metadata || {}),
+        [value]: itemDetail
+      };
     }
 
     setPatient(updatedPatient);
@@ -542,8 +524,11 @@ function App() {
       setSuggestedUpdates(prev => {
         if (!prev) return null;
         return {
+          ...prev,
           triggers: type === 'trigger' ? prev.triggers.filter(t => t !== value) : prev.triggers,
-          preferences: type === 'preference' ? prev.preferences.filter(p => p !== value) : prev.preferences
+          preferences: type === 'preference' ? prev.preferences.filter(p => p !== value) : prev.preferences,
+          triggerDetails: type === 'trigger' ? (prev.triggerDetails || []).filter(t => t.name !== value) : prev.triggerDetails,
+          preferenceDetails: type === 'preference' ? (prev.preferenceDetails || []).filter(p => p.name !== value) : prev.preferenceDetails
         };
       });
     }
@@ -608,35 +593,69 @@ function App() {
   };
 
   const handleAddTrigger = () => {
-    if (newTrigger.trim() && !patient.triggers.includes(newTrigger.trim())) {
+    const val = newTrigger.trim();
+    if (val && !patient.triggers.includes(val)) {
       setPatient({
         ...patient,
-        triggers: [...patient.triggers, newTrigger.trim()]
+        triggers: [...patient.triggers, val],
+        trigger_metadata: {
+          ...(patient.trigger_metadata || {}),
+          [val]: {
+            name: val,
+            status: 'confirmed',
+            confidence: 1.0,
+            source: 'Manually added by caregiver'
+          }
+        }
       });
       setNewTrigger('');
     }
   };
 
   const handleRemoveTrigger = (index) => {
+    const val = patient.triggers[index];
     const updated = [...patient.triggers];
     updated.splice(index, 1);
-    setPatient({ ...patient, triggers: updated });
+    const updatedMeta = { ...(patient.trigger_metadata || {}) };
+    delete updatedMeta[val];
+    setPatient({
+      ...patient,
+      triggers: updated,
+      trigger_metadata: updatedMeta
+    });
   };
 
   const handleAddPreference = () => {
-    if (newPreference.trim() && !patient.preferences.includes(newPreference.trim())) {
+    const val = newPreference.trim();
+    if (val && !patient.preferences.includes(val)) {
       setPatient({
         ...patient,
-        preferences: [...patient.preferences, newPreference.trim()]
+        preferences: [...patient.preferences, val],
+        preference_metadata: {
+          ...(patient.preference_metadata || {}),
+          [val]: {
+            name: val,
+            status: 'confirmed',
+            confidence: 1.0,
+            source: 'Manually added by caregiver'
+          }
+        }
       });
       setNewPreference('');
     }
   };
 
   const handleRemovePreference = (index) => {
+    const val = patient.preferences[index];
     const updated = [...patient.preferences];
     updated.splice(index, 1);
-    setPatient({ ...patient, preferences: updated });
+    const updatedMeta = { ...(patient.preference_metadata || {}) };
+    delete updatedMeta[val];
+    setPatient({
+      ...patient,
+      preferences: updated,
+      preference_metadata: updatedMeta
+    });
   };
 
   // ----------------------------------------------------
@@ -819,11 +838,19 @@ function App() {
              setSuggestedUpdates(prev => {
                const currentTriggers = prev?.triggers || [];
                const currentPrefs = prev?.preferences || [];
+               const currentTriggerDetails = prev?.triggerDetails || [];
+               const currentPrefDetails = prev?.preferenceDetails || [];
+
                const newTriggers = data.suggested_profile_updates.new_triggers || [];
                const newPrefs = data.suggested_profile_updates.new_preferences || [];
+               const newTriggerDetails = data.suggested_profile_updates.new_triggers_details || [];
+               const newPrefDetails = data.suggested_profile_updates.new_preferences_details || [];
+
                return {
                  triggers: [...new Set([...currentTriggers, ...newTriggers])],
-                 preferences: [...new Set([...currentPrefs, ...newPrefs])]
+                 preferences: [...new Set([...currentPrefs, ...newPrefs])],
+                 triggerDetails: [...currentTriggerDetails, ...newTriggerDetails],
+                 preferenceDetails: [...currentPrefDetails, ...newPrefDetails]
                };
              });
            }
@@ -841,15 +868,39 @@ function App() {
           // Simulating trigger/preference extraction based on input keywords
           const lastLower = userMsg.content.toLowerCase();
           if (lastLower.includes("bright") || lastLower.includes("glare")) {
-            setSuggestedUpdates(prev => ({
-              triggers: [...new Set([...(prev?.triggers || []), "bright lights"])],
-              preferences: prev?.preferences || []
-            }));
+            setSuggestedUpdates(prev => {
+              const currentTriggers = prev?.triggers || [];
+              const currentPrefs = prev?.preferences || [];
+              const currentTriggerDetails = prev?.triggerDetails || [];
+              return {
+                triggers: [...new Set([...currentTriggers, "bright lights"])],
+                preferences: currentPrefs,
+                triggerDetails: [...currentTriggerDetails, {
+                  name: "bright lights",
+                  status: "suspected",
+                  confidence: 0.85,
+                  source: `Caregiver mentioned glare or bright light: "${userMsg.content}"`
+                }],
+                preferenceDetails: prev?.preferenceDetails || []
+              };
+            });
           } else if (lastLower.includes("music") || lastLower.includes("song")) {
-            setSuggestedUpdates(prev => ({
-              triggers: prev?.triggers || [],
-              preferences: [...new Set([...(prev?.preferences || []), "listening to music"])]
-            }));
+            setSuggestedUpdates(prev => {
+              const currentTriggers = prev?.triggers || [];
+              const currentPrefs = prev?.preferences || [];
+              const currentPrefDetails = prev?.preferenceDetails || [];
+              return {
+                triggers: currentTriggers,
+                preferences: [...new Set([...currentPrefs, "listening to music"])],
+                triggerDetails: prev?.triggerDetails || [],
+                preferenceDetails: [...currentPrefDetails, {
+                  name: "listening to music",
+                  status: "suspected",
+                  confidence: 0.90,
+                  source: `Caregiver mentioned music or song: "${userMsg.content}"`
+                }]
+              };
+            });
           }
         }, 1000);
       }
@@ -1185,137 +1236,7 @@ function App() {
 
   const displayResult = translatedResult || analysisResult;
 
-  if (!isAuthenticated) {
-    return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        background: 'var(--bg-dark)',
-        color: 'var(--text-main)',
-        fontFamily: "'Plus Jakarta Sans', sans-serif",
-        padding: '20px'
-      }}>
-        {/* Floating Theme Toggle */}
-        <div style={{ position: 'absolute', top: '20px', right: '20px' }}>
-          <button
-            onClick={toggleTheme}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '0.5rem',
-              borderRadius: '8px',
-              color: 'var(--text-muted)'
-            }}
-          >
-            {theme === 'dark' ? <Sun size={24} /> : <Moon size={24} />}
-          </button>
-        </div>
 
-        {/* Card */}
-        <div style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '16px',
-          padding: '40px',
-          maxWidth: '450px',
-          width: '100%',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.15)',
-          textAlign: 'center',
-          backdropFilter: 'blur(16px)'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-            <div style={{
-              background: 'rgba(6, 182, 212, 0.1)',
-              padding: '16px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Activity style={{ color: 'var(--primary)' }} size={48} />
-            </div>
-          </div>
-
-          <h2 style={{ fontSize: '1.8rem', fontWeight: '800', margin: '0 0 8px 0', background: 'linear-gradient(135deg, var(--text-main) 30%, var(--primary) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            DementiaCare Coach
-          </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', margin: '0 0 30px 0', lineHeight: '1.5' }}>
-            To protect sensitive patient health details, please enter your secure User Access Key below.
-          </p>
-
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', gap: '6px' }}>
-              <label htmlFor="accessKey" style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-muted)' }}>
-                Access Key
-              </label>
-              <input
-                id="accessKey"
-                type="password"
-                value={loginInput}
-                onChange={(e) => setLoginInput(e.target.value)}
-                placeholder="••••••••••••••••"
-                style={{
-                  padding: '12px 16px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color)',
-                  background: 'rgba(15, 23, 42, 0.6)',
-                  color: 'var(--text-main)',
-                  fontSize: '1rem',
-                  outline: 'none',
-                  transition: 'border-color 0.2s'
-                }}
-              />
-            </div>
-
-            {loginError && (
-              <div style={{
-                background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                color: '#ef4444',
-                padding: '10px 14px',
-                borderRadius: '6px',
-                fontSize: '0.85rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                textAlign: 'left'
-              }}>
-                <AlertTriangle size={16} style={{ flexShrink: 0 }} />
-                <span>{loginError}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              style={{
-                padding: '12px',
-                borderRadius: '8px',
-                border: 'none',
-                background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)',
-                color: '#0f172a',
-                fontSize: '1rem',
-                fontWeight: '700',
-                cursor: 'pointer',
-                transition: 'opacity 0.2s',
-                marginTop: '10px'
-              }}
-              onMouseOver={(e) => e.target.style.opacity = '0.9'}
-              onMouseOut={(e) => e.target.style.opacity = '1'}
-            >
-              Verify and Access
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="app-container">
@@ -1706,48 +1627,88 @@ function App() {
               {/* Human-in-the-Loop Profile Enrichment Banners */}
               {suggestedUpdates && (suggestedUpdates.triggers?.length > 0 || suggestedUpdates.preferences?.length > 0) && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
-                  {suggestedUpdates.triggers?.map((trigger, idx) => (
-                    <div key={`st-${idx}`} style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      background: 'rgba(245, 158, 11, 0.06)',
-                      border: '1px solid rgba(245, 158, 11, 0.3)',
-                      borderRadius: '10px', padding: '0.75rem 1rem', gap: '0.75rem'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--text-main)' }}>
-                        <AlertTriangle size={15} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />
-                        <span>New trigger detected: <strong>"{trigger}"</strong>. Add to {patient.name}'s profile?</span>
+                  {suggestedUpdates.triggers?.map((trigger, idx) => {
+                    const detail = suggestedUpdates.triggerDetails?.find(x => x.name === trigger);
+                    const confidencePercent = detail && detail.confidence !== undefined ? Math.round(detail.confidence * 100) : 75;
+                    const sourceText = detail ? detail.source : "AI chat analysis";
+                    return (
+                      <div key={`st-${idx}`} style={{
+                        display: 'flex', flexDirection: 'column',
+                        background: 'rgba(245, 158, 11, 0.06)',
+                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                        borderRadius: '10px', padding: '0.75rem 1rem', gap: '0.5rem'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--text-main)' }}>
+                          <AlertTriangle size={15} style={{ color: 'var(--color-warning)', flexShrink: 0, marginTop: '2px' }} />
+                          <div style={{ flex: 1 }}>
+                            <span>New trigger detected: <strong>"{trigger}"</strong> with <strong>{confidencePercent}% confidence</strong>.</span>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                              Evidence: "{sourceText}"
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignSelf: 'flex-end' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ padding: '0.2rem 0.7rem', fontSize: '0.8rem' }}
+                            onClick={() => handleApplySuggestedUpdate('trigger', trigger, 'suspected')}
+                          >
+                            + Monitor (Suspected)
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            style={{ padding: '0.2rem 0.7rem', fontSize: '0.8rem', background: '#f59e0b', borderColor: '#f59e0b' }}
+                            onClick={() => handleApplySuggestedUpdate('trigger', trigger, 'confirmed')}
+                          >
+                            ✓ Confirm Active
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ padding: '0.2rem 0.7rem', fontSize: '0.8rem', flexShrink: 0 }}
-                        onClick={() => handleApplySuggestedUpdate('trigger', trigger)}
-                      >
-                        + Add
-                      </button>
-                    </div>
-                  ))}
-                  {suggestedUpdates.preferences?.map((pref, idx) => (
-                    <div key={`sp-${idx}`} style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      background: 'rgba(16, 185, 129, 0.06)',
-                      border: '1px solid rgba(16, 185, 129, 0.3)',
-                      borderRadius: '10px', padding: '0.75rem 1rem', gap: '0.75rem'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--text-main)' }}>
-                        <Heart size={15} style={{ color: 'var(--color-success)', flexShrink: 0 }} />
-                        <span>New preference detected: <strong>"{pref}"</strong>. Add to {patient.name}'s profile?</span>
+                    );
+                  })}
+                  {suggestedUpdates.preferences?.map((pref, idx) => {
+                    const detail = suggestedUpdates.preferenceDetails?.find(x => x.name === pref);
+                    const confidencePercent = detail && detail.confidence !== undefined ? Math.round(detail.confidence * 100) : 75;
+                    const sourceText = detail ? detail.source : "AI chat analysis";
+                    return (
+                      <div key={`sp-${idx}`} style={{
+                        display: 'flex', flexDirection: 'column',
+                        background: 'rgba(16, 185, 129, 0.06)',
+                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        borderRadius: '10px', padding: '0.75rem 1rem', gap: '0.5rem'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--text-main)' }}>
+                          <Heart size={15} style={{ color: 'var(--color-success)', flexShrink: 0, marginTop: '2px' }} />
+                          <div style={{ flex: 1 }}>
+                            <span>New preference detected: <strong>"{pref}"</strong> with <strong>{confidencePercent}% confidence</strong>.</span>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                              Evidence: "{sourceText}"
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignSelf: 'flex-end' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ padding: '0.2rem 0.7rem', fontSize: '0.8rem' }}
+                            onClick={() => handleApplySuggestedUpdate('preference', pref, 'suspected')}
+                          >
+                            + Monitor (Suspected)
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            style={{ padding: '0.2rem 0.7rem', fontSize: '0.8rem', background: '#10b981', borderColor: '#10b981' }}
+                            onClick={() => handleApplySuggestedUpdate('preference', pref, 'confirmed')}
+                          >
+                            ✓ Confirm Active
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ padding: '0.2rem 0.7rem', fontSize: '0.8rem', flexShrink: 0 }}
-                        onClick={() => handleApplySuggestedUpdate('preference', pref)}
-                      >
-                        + Add
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -2188,14 +2149,52 @@ function App() {
                   </button>
                 </div>
                 <div className="tag-container">
-                  {patient.triggers.map((t, idx) => (
-                    <div key={idx} className="tag-pill">
-                      <span>{t}</span>
-                      <button type="button" className="tag-delete-btn" onClick={() => handleRemoveTrigger(idx)}>
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  ))}
+                  {patient.triggers.map((t, idx) => {
+                    const meta = patient.trigger_metadata?.[t];
+                    const isConfirmed = !meta || meta.status === 'confirmed';
+                    const confidenceVal = meta && meta.confidence !== undefined ? Math.round(meta.confidence * 100) : 100;
+
+                    return (
+                      <div key={idx} className="tag-pill" style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        borderColor: isConfirmed ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.4)',
+                        background: isConfirmed ? 'rgba(16, 185, 129, 0.03)' : 'rgba(245, 158, 11, 0.03)'
+                      }}>
+                        <span
+                          style={{ cursor: 'pointer' }}
+                          title="Click to toggle Confirmed/Suspected"
+                          onClick={() => {
+                            const updatedMeta = {
+                              ...(patient.trigger_metadata || {}),
+                              [t]: {
+                                ...(meta || { name: t, confidence: 1.0, source: 'Manual' }),
+                                status: isConfirmed ? 'suspected' : 'confirmed',
+                                confidence: isConfirmed ? 0.7 : 1.0
+                              }
+                            };
+                            setPatient({ ...patient, trigger_metadata: updatedMeta });
+                          }}
+                        >
+                          <strong>{t}</strong>
+                          <span style={{
+                            fontSize: '0.65rem',
+                            padding: '0.05rem 0.25rem',
+                            borderRadius: '3px',
+                            background: isConfirmed ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                            color: isConfirmed ? '#10b981' : '#f59e0b',
+                            marginLeft: '0.35rem',
+                            fontWeight: '600'
+                          }}>
+                            {isConfirmed ? '✓ Confirmed' : `? Suspected (${confidenceVal}%)`}
+                          </span>
+                        </span>
+                        <button type="button" className="tag-delete-btn" style={{ marginLeft: '0.35rem' }} onClick={() => handleRemoveTrigger(idx)}>
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -2217,14 +2216,52 @@ function App() {
                   </button>
                 </div>
                 <div className="tag-container">
-                  {patient.preferences.map((p, idx) => (
-                    <div key={idx} className="tag-pill" style={{ borderColor: 'var(--preference-tag-border)', color: 'var(--preference-tag-color)' }}>
-                      <span>{p}</span>
-                      <button type="button" className="tag-delete-btn" onClick={() => handleRemovePreference(idx)}>
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  ))}
+                  {patient.preferences.map((p, idx) => {
+                    const meta = patient.preference_metadata?.[p];
+                    const isConfirmed = !meta || meta.status === 'confirmed';
+                    const confidenceVal = meta && meta.confidence !== undefined ? Math.round(meta.confidence * 100) : 100;
+
+                    return (
+                      <div key={idx} className="tag-pill" style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        borderColor: isConfirmed ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.4)',
+                        background: isConfirmed ? 'rgba(16, 185, 129, 0.03)' : 'rgba(245, 158, 11, 0.03)'
+                      }}>
+                        <span
+                          style={{ cursor: 'pointer' }}
+                          title="Click to toggle Confirmed/Suspected"
+                          onClick={() => {
+                            const updatedMeta = {
+                              ...(patient.preference_metadata || {}),
+                              [p]: {
+                                ...(meta || { name: p, confidence: 1.0, source: 'Manual' }),
+                                status: isConfirmed ? 'suspected' : 'confirmed',
+                                confidence: isConfirmed ? 0.7 : 1.0
+                              }
+                            };
+                            setPatient({ ...patient, preference_metadata: updatedMeta });
+                          }}
+                        >
+                          <strong>{p}</strong>
+                          <span style={{
+                            fontSize: '0.65rem',
+                            padding: '0.05rem 0.25rem',
+                            borderRadius: '3px',
+                            background: isConfirmed ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                            color: isConfirmed ? '#10b981' : '#f59e0b',
+                            marginLeft: '0.35rem',
+                            fontWeight: '600'
+                          }}>
+                            {isConfirmed ? '✓ Confirmed' : `? Suspected (${confidenceVal}%)`}
+                          </span>
+                        </span>
+                        <button type="button" className="tag-delete-btn" style={{ marginLeft: '0.35rem' }} onClick={() => handleRemovePreference(idx)}>
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

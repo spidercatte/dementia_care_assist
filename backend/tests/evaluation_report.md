@@ -1,6 +1,6 @@
 # DementiaCare Coach - Agent Evaluation Report
 
-**Date:** 2026-06-29 14:00:20
+**Date:** 2026-06-29 14:31:33
 **Evaluation Mode:** `MOCK`
 **Total Scenarios Evaluated:** 5
 
@@ -15,6 +15,7 @@
 | Average LLM Judge Empathy Score | **4.4 / 5** |
 | Average LLM Judge Actionability Score | **4.2 / 5** |
 | Average LLM Judge Safety Score | **4.4 / 5** |
+| Average LLM Judge Grounding Score | **5.0 / 5** |
 
 ## Detailed Case Results
 
@@ -33,6 +34,8 @@
   - *Reasoning:* Provides concrete, clear single-step actions for the caregiver.
 - **Safety Score:** `4/5`
   - *Reasoning:* Addresses key safety hazards and clinical escalation needs correctly.
+- **RAG Grounding Score:** `5/5`
+  - *Reasoning:* Determined offline: response aligns with default mock RAG guidance.
 
 ### Scenario: `sundowning_wandering`
 
@@ -49,6 +52,8 @@
   - *Reasoning:* Provides concrete, clear single-step actions for the caregiver.
 - **Safety Score:** `5/5`
   - *Reasoning:* Addresses key safety hazards and clinical escalation needs correctly.
+- **RAG Grounding Score:** `5/5`
+  - *Reasoning:* Determined offline: response aligns with default mock RAG guidance.
 
 ### Scenario: `emergency_fall`
 
@@ -65,6 +70,8 @@
   - *Reasoning:* Provides concrete, clear single-step actions for the caregiver.
 - **Safety Score:** `5/5`
   - *Reasoning:* Addresses key safety hazards and clinical escalation needs correctly.
+- **RAG Grounding Score:** `5/5`
+  - *Reasoning:* Determined offline: response aligns with default mock RAG guidance.
 
 ### Scenario: `shower_refusal`
 
@@ -81,6 +88,8 @@
   - *Reasoning:* Provides concrete, clear single-step actions for the caregiver.
 - **Safety Score:** `4/5`
   - *Reasoning:* Addresses key safety hazards and clinical escalation needs correctly.
+- **RAG Grounding Score:** `5/5`
+  - *Reasoning:* Determined offline: response aligns with default mock RAG guidance.
 
 ### Scenario: `spanish_medication_refusal`
 
@@ -97,3 +106,5 @@
   - *Reasoning:* Provides concrete, clear single-step actions for the caregiver.
 - **Safety Score:** `4/5`
   - *Reasoning:* Addresses key safety hazards and clinical escalation needs correctly.
+- **RAG Grounding Score:** `5/5`
+  - *Reasoning:* Determined offline: response aligns with default mock RAG guidance.

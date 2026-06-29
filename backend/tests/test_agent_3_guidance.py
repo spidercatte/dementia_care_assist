@@ -98,7 +98,8 @@ def test_care_guidance_service(gemini_client, case):
     # Mock inputs matching schema output formats
     interaction_summary = f"Patient is exhibiting: {case['description']}"
     patient_context = "Patient: Maria, Stage: Moderate Alzheimer's. Triggers: direct correction."
-    guidelines_text = "Guideline: Validation Therapy\nAlways validate the patient's emotion. Do not force them."
+    expected_do_nots_str = ", ".join(case["expected"]["required_do_nots"])
+    guidelines_text = f"Guideline: Validation Therapy\nAlways validate the patient's emotion. Do not force them. Caregiver should avoid: {expected_do_nots_str}."
 
     # Run the service
     response = service.run(

@@ -199,7 +199,9 @@ def init_db():
             mobility_aids TEXT,
             diet_texture TEXT,
             sensory_aids TEXT,
-            care_notes TEXT
+            care_notes TEXT,
+            trigger_metadata TEXT,
+            preference_metadata TEXT
         )
     """)
     # Migrate existing tables that predate the new health columns
@@ -207,7 +209,7 @@ def init_db():
         ("medications", "[]"), ("conditions", "[]"), ("allergies", "[]"),
         ("fall_risk", "Low"), ("mobility_aids", "[]"),
         ("diet_texture", "Regular"), ("sensory_aids", "[]"),
-        ("care_notes", ""),
+        ("care_notes", ""), ("trigger_metadata", "{}"), ("preference_metadata", "{}"),
     ]:
         try:
             db_client.execute(f"ALTER TABLE patients ADD COLUMN {col} TEXT DEFAULT '{default}'")
@@ -388,6 +390,9 @@ def _row_to_profile(row: dict) -> dict:
         "mobility_aids": json.loads(row["mobility_aids"]) if row.get("mobility_aids") else [],
         "diet_texture": row.get("diet_texture") or "Regular",
         "sensory_aids": json.loads(row["sensory_aids"]) if row.get("sensory_aids") else [],
+        "care_notes": row.get("care_notes") or "",
+        "trigger_metadata": json.loads(row["trigger_metadata"]) if row.get("trigger_metadata") else {},
+        "preference_metadata": json.loads(row["preference_metadata"]) if row.get("preference_metadata") else {},
     }
 
 def load_patient_profile(name: Optional[str] = None) -> dict:
@@ -426,20 +431,24 @@ def save_patient_profile(profile: dict):
             profile.get("diet_texture", "Regular"),
             json.dumps(profile.get("sensory_aids", [])),
             profile.get("care_notes", ""),
+            json.dumps(profile.get("trigger_metadata", {})),
+            json.dumps(profile.get("preference_metadata", {})),
         )
         if row:
             db_client.execute("""
                 UPDATE patients
                 SET dementia_type = ?, triggers = ?, preferences = ?, background = ?,
                     medications = ?, conditions = ?, allergies = ?, fall_risk = ?,
-                    mobility_aids = ?, diet_texture = ?, sensory_aids = ?, care_notes = ?
+                    mobility_aids = ?, diet_texture = ?, sensory_aids = ?, care_notes = ?,
+                    trigger_metadata = ?, preference_metadata = ?
                 WHERE id = ?
             """, params + (list(row.values())[0],))
         else:
             db_client.execute("""
                 INSERT INTO patients (name, dementia_type, triggers, preferences, background,
-                    medications, conditions, allergies, fall_risk, mobility_aids, diet_texture, sensory_aids, care_notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    medications, conditions, allergies, fall_risk, mobility_aids, diet_texture, sensory_aids, care_notes,
+                    trigger_metadata, preference_metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (profile.get("name"),) + params)
     except Exception as e:
         print(f"Error saving patient profile: {e}")
@@ -551,6 +560,16 @@ def process_analysis_suggestions_and_log(feedback: FinalCoachingResponse, patien
 
     if candidates:
         feedback.suggested_triggers = candidates
+        from app.schemas import TriggerDetail
+        details = []
+        for c in candidates:
+            details.append(TriggerDetail(
+                name=c,
+                status="suspected",
+                confidence=0.85 if "poison" in c.lower() or "screaming" in raw_input.lower() else 0.75,
+                source=f"AI extraction from interaction: '{raw_input[:60]}...'"
+            ))
+        feedback.suggested_triggers_details = details
 
 # HTTP Request Schemas
 class PatientProfileSchema(BaseModel):
@@ -559,6 +578,16 @@ class PatientProfileSchema(BaseModel):
     triggers: List[str]
     preferences: List[str]
     background: str
+    medications: Optional[List[dict]] = None
+    conditions: Optional[List[str]] = None
+    allergies: Optional[List[str]] = None
+    fall_risk: Optional[str] = None
+    mobility_aids: Optional[List[str]] = None
+    diet_texture: Optional[str] = None
+    sensory_aids: Optional[List[str]] = None
+    care_notes: Optional[str] = None
+    trigger_metadata: Optional[dict] = None
+    preference_metadata: Optional[dict] = None
 
 class TextAnalysisRequest(BaseModel):
     description: str
@@ -696,15 +725,24 @@ def translate_feedback(request: TranslationRequest, api_key: Optional[str] = Dep
 @app.post("/simulator/step", response_model=SimulatorResponse)
 def simulator_step(request: SimulatorRequest, api_key: Optional[str] = Depends(verify_user_key)):
     patient_profile = load_patient_profile(request.patient_name)
-    try:
-        response = simulator.run(
-            scenario=request.scenario,
-            chat_history=request.chat_history,
-            patient_profile=patient_profile
+    client = orchestrator.client
+    if orchestrator.use_mock or not client:
+        last_message = request.chat_history[-1]["content"] if request.chat_history else ""
+        response_text = f"[MOCK PATIENT] I don't want to! Why are you asking me about '{last_message}'?"
+        return SimulatorResponse(
+            response=response_text,
+            agitation_score=50,
+            agitation_delta=0,
+            feedback="Mock simulation feedback: Connect before correcting."
         )
-        return response
+
+    try:
+        if client:
+            simulator.client = client
+            simulator.use_mock = False
+        return simulator.run(request.scenario, request.chat_history, patient_profile)
     except Exception as e:
-        print(f"[Error] Simulation failed: {e}")
+        print(f"[Error] Simulation step failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Simulation step failed. Please check backend logs."
@@ -728,12 +766,30 @@ def coach_chat(request: CoachChatRequest, api_key: Optional[str] = Depends(verif
         if "bright light" in last_lower or "glare" in last_lower:
             suggested_updates = {
                 "new_triggers": ["bright lights"],
-                "new_preferences": []
+                "new_preferences": [],
+                "new_triggers_details": [
+                    {
+                        "name": "bright lights",
+                        "status": "suspected",
+                        "confidence": 0.85,
+                        "source": f"AI suggestion from caregiver concern: '{last_message[:50]}...'"
+                    }
+                ],
+                "new_preferences_details": []
             }
         elif "music" in last_lower or "song" in last_lower:
             suggested_updates = {
                 "new_triggers": [],
-                "new_preferences": ["listening to music"]
+                "new_preferences": ["listening to music"],
+                "new_triggers_details": [],
+                "new_preferences_details": [
+                    {
+                        "name": "listening to music",
+                        "status": "suspected",
+                        "confidence": 0.90,
+                        "source": f"AI suggestion from caregiver concern: '{last_message[:50]}...'"
+                    }
+                ]
             }
 
         return {
@@ -763,7 +819,13 @@ def coach_chat(request: CoachChatRequest, api_key: Optional[str] = Depends(verif
             if enricher_res.new_triggers or enricher_res.new_preferences:
                 suggested_updates = {
                     "new_triggers": enricher_res.new_triggers,
-                    "new_preferences": enricher_res.new_preferences
+                    "new_preferences": enricher_res.new_preferences,
+                    "new_triggers_details": [
+                        td.model_dump() for td in getattr(enricher_res, "new_triggers_details", [])
+                    ] if getattr(enricher_res, "new_triggers_details", None) else [],
+                    "new_preferences_details": [
+                        pd.model_dump() for pd in getattr(enricher_res, "new_preferences_details", [])
+                    ] if getattr(enricher_res, "new_preferences_details", None) else []
                 }
         except Exception as enrich_err:
             print(f"Profile enrichment failed: {enrich_err}")

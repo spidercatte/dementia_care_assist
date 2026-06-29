@@ -61,7 +61,16 @@ This document serves as the architectural blueprint and directory mapping for th
 
 SQLite database tracking state and compliance logs:
 
-- `patients` — Profiles (id, name, age, cognitive_stage, background, triggers, preferences).
+- `patients` — Profiles:
+  - `id` (INTEGER, Primary Key)
+  - `name` (TEXT)
+  - `dementia_type` (TEXT)
+  - `triggers` (TEXT, JSON array of strings)
+  - `preferences` (TEXT, JSON array of strings)
+  - `background` (TEXT)
+  - `trigger_metadata` (TEXT, JSON dictionary of TriggerDetails)
+  - `preference_metadata` (TEXT, JSON dictionary of PreferenceDetails)
+  - Health history columns (medications, conditions, allergies, fall_risk, mobility_aids, diet_texture, sensory_aids, care_notes)
 - `interactions` — Historical caregiver interactions and generated coach recommendations.
 - `consent_records` — Compliance tracking:
   - `patient_name` (TEXT)
@@ -76,3 +85,22 @@ SQLite database tracking state and compliance logs:
   - `granted_by` (TEXT)
   - `result` (TEXT) - `'GRANTED'` or `'REJECTED'`
   - `timestamp` (TEXT)
+
+---
+
+## 4. Tiered-Uncertainty Patient Profiles & Downstream Bias Mitigation
+
+To prevent single point of profile truth errors (where mis-encoded patient triggers or comfort preferences early on propagate down and bias every downstream coaching session), the system implements a **tiered-uncertainty model**:
+
+1. **Structured Details & Provenance**: Triggers and preferences are stored with a metadata envelope containing:
+   - `status`: `'confirmed'` (manually verified or caregiver validated) or `'suspected'` (AI-suggested but unverified).
+   - `confidence`: Confidence score (0.0 to 1.0) assessing documentation strength or extraction reliability.
+   - `source`: Provenance tracking showing origin context (e.g. 'initial clinical intake', 'AI chat log snippet').
+2. **Context-Sensitive Care Synthesis**:
+   - Step 2 (`PatientContextProcessor`) extracts and classifies baseline triggers into confirmed vs suspected sets. Conflicting or low-confidence parameters trigger a `bias_warning_note`.
+   - Step 3 (`CareGuidanceService`) receives the uncertainty status and confidence level for each parameter, ensuring clinical guidance is not biased by unconfirmed details.
+   - Step 5 (`CoachingSynthesizer`) receives the bias warnings and flags unconfirmed parameters to caregivers, reminding them to verify them in clinical practice.
+3. **Interactive Human-in-the-Loop (HITL)**:
+   - Suggested triggers/preferences are displayed in the UI with confidence scores and source quotes.
+   - Caregivers can choose to "+ Monitor (Suspected)" or "✓ Confirm Active".
+   - Caregivers can toggle confirmation status interactively directly on the profile tags.

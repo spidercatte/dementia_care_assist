@@ -42,7 +42,7 @@ DementiaCare Coach is a multi-modal AI agent that:
 |---|---|
 | **Multi-agent system (ADK)** | `adk-agent-scaffold/app/agent.py` — ADK conversational coach; `backend/app/agents/` — 7-agent pipeline |
 | **MCP Server** | `mcp_server/app/mcp_server.py` — standalone FastMCP service over SSE on port 8002, consumed by the ADK agent |
-| **Human-in-the-Loop (HITL)** | `ProfileEnricherAgent` detects new triggers/preferences from coach conversations; surfaces them to the caregiver for approval before updating the patient profile |
+| **Human-in-the-Loop (HITL)** | Tiered-Uncertainty Profile Architecture: `ProfileEnricherAgent` detects new triggers/preferences with confidence ratings and source evidence; surfaces them to the caregiver for approval as Confirmed or Suspected (to monitor); caregiver can toggle confirmation status directly on tags |
 | **Security features** | `backend/app/main.py` — API key auth (`X-API-Key`), rate limiting (60 req/min/IP), CORS |
 | **Deployability** | `docker-compose.yaml` — 5-service stack (PostgreSQL, ChromaDB, FastAPI backend, standalone MCP server, React frontend); Cloud Run deployment scripts |
 | **Antigravity** | See video demo |

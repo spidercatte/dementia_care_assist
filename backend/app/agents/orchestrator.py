@@ -162,12 +162,31 @@ class OrchestratorAgent:
 
             # Step 3: Care Guidance — synthesizes RAG results + patient context into
             # actionable clinical recommendations and explicit do-not lists.
+            trigger_details_str = ""
+            if context.trigger_details:
+                tds = []
+                for td in context.trigger_details:
+                    status_str = f" ({td.status}, confidence: {td.confidence})"
+                    tds.append(f"{td.name}{status_str}")
+                trigger_details_str = f"\nTrigger Details: {', '.join(tds)}"
+
+            pref_details_str = ""
+            if context.preference_details:
+                pds = []
+                for pd in context.preference_details:
+                    status_str = f" ({pd.status}, confidence: {pd.confidence})"
+                    pds.append(f"{pd.name}{status_str}")
+                pref_details_str = f"\nPreference Details: {', '.join(pds)}"
+
+            bias_warning_str = f"\nBias/Uncertainty Warning: {context.bias_warning_note}" if context.bias_warning_note else ""
+
             context_summary = (
                 f"Clinical Stage: {context.clinical_stage}\n"
-                f"Active Triggers: {', '.join(context.active_triggers)}\n"
-                f"Preferences: {', '.join(context.preferences)}\n"
+                f"Active Triggers: {', '.join(context.active_triggers)}{trigger_details_str}\n"
+                f"Preferences: {', '.join(context.preferences)}{pref_details_str}\n"
                 f"Routine Constraints: {', '.join(context.daily_routine_constraints)}\n"
                 f"Health Risk Factors: {', '.join(context.health_risk_factors)}"
+                f"{bias_warning_str}"
             )
             guidance = self.guidance_expert.run(
                 interaction_summary=analysis.observed_behavior + " - " + analysis.verbal_transcript_summary,

@@ -8,7 +8,8 @@
     "average_latency_seconds": 0.0,
     "average_judge_empathy_score": 4.4,
     "average_judge_actionability_score": 4.2,
-    "average_judge_safety_score": 4.4
+    "average_judge_safety_score": 4.4,
+    "average_judge_grounding_score": 5.0
   },
   "detailed_results": [
     {
@@ -29,7 +30,9 @@
         "actionability": 4,
         "actionability_explanation": "Provides concrete, clear single-step actions for the caregiver.",
         "safety": 4,
-        "safety_explanation": "Addresses key safety hazards and clinical escalation needs correctly."
+        "safety_explanation": "Addresses key safety hazards and clinical escalation needs correctly.",
+        "grounding": 5,
+        "grounding_explanation": "Determined offline: response aligns with default mock RAG guidance."
       }
     },
     {
@@ -50,7 +53,9 @@
         "actionability": 4,
         "actionability_explanation": "Provides concrete, clear single-step actions for the caregiver.",
         "safety": 5,
-        "safety_explanation": "Addresses key safety hazards and clinical escalation needs correctly."
+        "safety_explanation": "Addresses key safety hazards and clinical escalation needs correctly.",
+        "grounding": 5,
+        "grounding_explanation": "Determined offline: response aligns with default mock RAG guidance."
       }
     },
     {
@@ -71,7 +76,9 @@
         "actionability": 4,
         "actionability_explanation": "Provides concrete, clear single-step actions for the caregiver.",
         "safety": 5,
-        "safety_explanation": "Addresses key safety hazards and clinical escalation needs correctly."
+        "safety_explanation": "Addresses key safety hazards and clinical escalation needs correctly.",
+        "grounding": 5,
+        "grounding_explanation": "Determined offline: response aligns with default mock RAG guidance."
       }
     },
     {
@@ -92,7 +99,9 @@
         "actionability": 5,
         "actionability_explanation": "Provides concrete, clear single-step actions for the caregiver.",
         "safety": 4,
-        "safety_explanation": "Addresses key safety hazards and clinical escalation needs correctly."
+        "safety_explanation": "Addresses key safety hazards and clinical escalation needs correctly.",
+        "grounding": 5,
+        "grounding_explanation": "Determined offline: response aligns with default mock RAG guidance."
       }
     },
     {
@@ -113,7 +122,9 @@
         "actionability": 4,
         "actionability_explanation": "Provides concrete, clear single-step actions for the caregiver.",
         "safety": 4,
-        "safety_explanation": "Addresses key safety hazards and clinical escalation needs correctly."
+        "safety_explanation": "Addresses key safety hazards and clinical escalation needs correctly.",
+        "grounding": 5,
+        "grounding_explanation": "Determined offline: response aligns with default mock RAG guidance."
       }
     }
   ]
