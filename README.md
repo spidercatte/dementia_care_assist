@@ -7,6 +7,13 @@ DementiaCare Coach helps family and clinical caregivers manage difficult dementi
 
 ---
 
+> [!WARNING]
+> **Clinical Disclaimer & Liability Limits:** DementiaCare Coach is an AI-powered educational coaching tool designed to help caregivers learn communication techniques. It is **not** a clinical diagnostic tool, medical device, or replacement for professional medical advice, clinical diagnosis, treatment, or crisis intervention.
+>
+> Caregivers assume all accountability and risk for applying dialogue suggestions ("Try saying" / "Avoid saying") in real-world scenarios. AI recommendations are educational and may fail or backfire. In a medical crisis, physical danger, aggression, or emergency, prioritize safety and immediately contact emergency services (911) or a licensed medical professional.
+
+---
+
 ## The Problem
 
 Over 55 million people worldwide live with dementia. The majority are cared for at home by family members who receive little to no professional training. When a patient becomes agitated, refuses medication, or exhibits distressing behaviors, caregivers often respond intuitively — and frequently make the situation worse by correcting the patient's reality, arguing, or rushing them.
@@ -382,14 +389,33 @@ dementia_care/
 
 ---
 
-## Security
+## Security, Privacy & Media Retention
 
-- **API key authentication** — `X-API-Key` header required on all caregiver and admin endpoints
-- **Role separation** — separate `USER_API_KEY` and `ADMIN_API_KEY` (admin required for seeding/maintenance)
-- **Rate limiting** — 60 requests/minute per IP address
-- **CORS** — explicit allowlist of frontend origins
-- **No secrets in code** — all keys via environment variables / `.env` files (never committed)
-- **Safety audit trail** — escalations written to the database for clinician review
+### System Security
+- **API key authentication** — `X-API-Key` header required on all caregiver and admin endpoints.
+- **Role separation** — separate `USER_API_KEY` and `ADMIN_API_KEY` (admin required for seeding/maintenance).
+- **Rate limiting** — 60 requests/minute per IP address.
+- **CORS** — explicit allowlist of frontend origins.
+- **No secrets in code** — all keys via environment variables / `.env` files (never committed).
+- **Safety audit trail** — safety escalations are written to the database for clinician review.
+
+### Privacy, Ethics & Patient Consent
+Recording a patient in a moment of distress is ethically sensitive.
+- **Surrogate Consent Requirement**: The system implements an active database-enforced surrogate consent schema. Media analysis requires documented consent from the patient's legal decision-maker, scoped per media type (text, audio, or video). We acknowledge that patients with moderate-to-advanced dementia typically cannot provide direct informed consent; consent is therefore obtained from and attributable to the designated caregiver or legal authority (such as Power of Attorney or Legal Guardian), not the patient.
+- **Validation Gating**: Enforced at the orchestration intake layer. Before any media is processed or uploaded to Gemini's File API, the system checks the database `consent_records` for that patient. If consent for the required media type (e.g., video) is not active, the upload is immediately rejected with a detailed validation notice.
+- **Audit Trails**: Consent verification checks are logged to the `consent_audit_logs` database table (recording who authorized the scope, required scope, allowed scope, verification result, and a timestamp), creating a secure, clinical-grade audit trail.
+- **Text-Only Alternative**: Caregivers can type a written description of the interaction in the text input box instead of uploading media. This completely avoids recording or uploading any video or audio of the patient, and is the recommended approach for sensitive situations.
+- **Privacy-Safe Recording Practices**: If choosing to record, caregivers are advised to focus the camera on themselves/their own responses, capture voice only, or avoid capturing the patient's face to protect patient privacy.
+
+### Media Retention & Automated Deletion Flow
+To safeguard sensitive data, raw media files (images, video, audio) are **never permanently stored** on the application database, servers, or external services:
+1. **Transient Local Buffers**: Files uploaded to the backend are saved to a temporary local file (using `tempfile.NamedTemporaryFile`) strictly for the duration of the API call and deleted immediately in a `finally` block.
+2. **Transient API Upload**: Files uploaded to the Gemini File API are processed and immediately deleted via `client.files.delete(...)` once the multi-agent analysis is complete.
+3. **Multi-Layered Garbage Collection**:
+   - **Startup Cleanup**: On backend server startup, a routine (`cleanup_old_gemini_files`) scans the Gemini File API and purges any orphaned files.
+   - **Periodic Background Worker**: A background task running on the FastAPI event loop periodically triggers a full scan and cleanup of the Gemini File API namespace every 15 minutes.
+   - **Absolute Expiry Fallback**: As an absolute safety net, Google natively deletes all uploaded Gemini File API files after 48 hours.
+4. **Text-Only Logging**: Only the abstracted text-based clinical summary (agitation level, behavior summary, likely trigger, and dialog suggestions) is retained in the database logs to show interaction history. No raw media is saved. Caregivers can wipe this text history permanently at any time via the UI.
 
 See [`threat_model.md`](./threat_model.md) for the full security threat model.
 

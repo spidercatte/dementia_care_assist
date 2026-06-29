@@ -1481,9 +1481,20 @@ function App() {
                   <strong>Coaching Aid Notice:</strong> This is a coaching assistant to help you learn communication skills. It does <strong>not</strong> provide medical or clinical advice. In a crisis, prioritize safety and call emergency services or a physician.
                 </span>
               </div>
-
               <div className="form-group">
                 <label className="form-label">Option A: Record or Upload Interaction</label>
+                <div style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--text-light)',
+                  background: 'rgba(59, 130, 246, 0.05)',
+                  borderLeft: '4px solid var(--primary)',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '8px',
+                  marginBottom: '1rem',
+                  lineHeight: '1.4'
+                }}>
+                  <strong>Privacy & Consent Notice:</strong> Recording a patient in a moment of distress is ethically sensitive. Please ensure you have legal consent or guardianship authority before uploading media. Raw media is processed securely in memory and deleted immediately after analysis. If consent or privacy is a concern, please focus the recording only on your own actions/responses, or use <strong>Option B (Text Description)</strong> below.
+                </div>
 
                 {showRecorder ? (
                   <div className="recorder-container">

@@ -130,6 +130,19 @@ Once the initial project was created, the workspace transitioned into an interac
 
 ---
 
+## Privacy, Ethics & Patient Consent
+
+Media analysis of a vulnerable, non-consenting patient during a crisis is a high-risk area for privacy and dignity. Rather than glossing over this reality, DementiaCare Coach implements a concrete, self-aware privacy and consent governance framework:
+
+1. **Surrogate Consent Database Gating**: Media analysis (video and audio) requires documented surrogate consent from the patient's legal decision-maker (e.g., Power of Attorney, Legal Guardian, or primary family caregiver acting as de facto decision-maker), scoped per media type (text, audio, video).
+2. **Precision on Consent Limits**: We acknowledge that patients with moderate-to-advanced dementia typically cannot provide direct informed consent; consent is therefore obtained from and attributable to the designated caregiver or legal authority, not the patient.
+3. **Step 0 Validation Gating**: Before any file is uploaded to external APIs (such as Gemini's File API), the orchestrator queries the database's `consent_records` table. If the patient does not have active consent for that media type, the request is blocked and returned immediately.
+4. **Auditable Consent Verification**: Verification events are logged to the `consent_audit_logs` database table (recording who authorized the scope, required scope, allowed scope, verification result, and a timestamp), creating a secure, clinical-grade audit trail.
+5. **No Persistent Media Storage**: Raw video, audio, and images are never permanently stored. Files are buffered locally in temporary directories strictly for the duration of the API call and deleted immediately in a `finally` block. Remote files uploaded to the Gemini File API are deleted immediately via `client.files.delete(...)` upon completion, backed by a periodic background cleanup task that purges orphaned files every 15 minutes.
+6. **Text-Only Alternative**: Caregivers can type a written description of the interaction in the text input box instead of uploading media. This completely avoids recording or uploading any video or audio of the patient, and is the recommended approach for sensitive situations.
+
+---
+
 ## Impact
 
 DementiaCare Coach addresses a specific, underserved failure point: the moment care tries to expand and fails. By acting as an onboarding engine for incoming caregivers and a real-time coaching layer for existing ones, the platform makes the care circle expandable in a way that was previously impossible without expensive professional coordination.

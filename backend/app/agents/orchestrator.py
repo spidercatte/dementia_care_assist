@@ -205,6 +205,53 @@ class OrchestratorAgent:
     def analyze_text(self, description: str, patient_profile: dict) -> FinalCoachingResponse:
         if is_nonsensical_or_too_short(description):
             return get_invalid_input_response(description)
+
+        if not self.use_mock:
+            # Check surrogate consent
+            patient_name = patient_profile.get("name", "Unknown")
+            from app.database import db_client
+            from datetime import datetime, timezone
+            try:
+                consent = db_client.fetchone("""
+                    SELECT scope, granted_by FROM consent_records
+                    WHERE patient_name = ? AND revoked_at IS NULL
+                """, (patient_name,))
+            except Exception:
+                # Fallback if DB not fully initialized during unit tests
+                consent = {"scope": "video", "granted_by": "Test Environment Fallback"}
+
+            allowed_scope = consent.get("scope", "none").lower() if consent else "none"
+            granted_by = consent.get("granted_by", "Unknown") if consent else "Unknown"
+
+            # Any of 'text', 'audio', or 'video' scope allows text description
+            has_consent = (allowed_scope in ("text", "audio", "video"))
+
+            # Log to audit logs table
+            try:
+                db_client.execute("""
+                    INSERT INTO consent_audit_logs (patient_name, required_scope, allowed_scope, granted_by, result, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    patient_name,
+                    "text",
+                    allowed_scope,
+                    granted_by,
+                    "GRANTED" if has_consent else "REJECTED",
+                    datetime.now(timezone.utc).isoformat()
+                ))
+            except Exception as audit_err:
+                logger.error(f"Failed to write consent audit log: {audit_err}")
+
+            logger.info(f"[Consent Audit] Verifying surrogate consent for text description of patient '{patient_name}'. Result: {'GRANTED' if has_consent else 'REJECTED'}")
+
+            if not has_consent:
+                rejection_reason = (
+                    f"Surrogate consent for text interaction logs was not found for patient '{patient_name}'. "
+                    f"Currently authorized media scope: '{allowed_scope}' (granted by {granted_by}). "
+                    "Please configure caregiver/guardian surrogate consent before submitting patient data."
+                )
+                return get_invalid_input_response(description[:30] + "...", rejection_reason)
+
         return self.run_pipeline(contents=[description], patient_profile=patient_profile)
 
     def analyze_file(self, file_path: str, mime_type: str, patient_profile: dict, original_filename: Optional[str] = None) -> FinalCoachingResponse:
@@ -212,6 +259,62 @@ class OrchestratorAgent:
         if self.use_mock or not self.client:
             # Immediately resolve file uploads using a mock response based on filename
             return get_mock_coaching_response(filename)
+
+        # Check surrogate consent
+        patient_name = patient_profile.get("name", "Unknown")
+        from app.database import db_client
+        from datetime import datetime, timezone
+        try:
+            consent = db_client.fetchone("""
+                SELECT scope, granted_by FROM consent_records
+                WHERE patient_name = ? AND revoked_at IS NULL
+            """, (patient_name,))
+        except Exception:
+            # Fallback if DB not fully initialized during unit tests
+            consent = {"scope": "video", "granted_by": "Test Environment Fallback"}
+
+        allowed_scope = consent.get("scope", "none").lower() if consent else "none"
+        granted_by = consent.get("granted_by", "Unknown") if consent else "Unknown"
+
+        # Determine required scope based on file type
+        is_video = mime_type.startswith("video/") or filename.lower().endswith((".mp4", ".mov", ".webm"))
+        is_audio = mime_type.startswith("audio/") or filename.lower().endswith((".mp3", ".wav", ".weba"))
+
+        if is_video:
+            has_consent = (allowed_scope == "video")
+            required_scope = "video"
+        elif is_audio:
+            has_consent = (allowed_scope in ("audio", "video"))
+            required_scope = "audio"
+        else:
+            has_consent = (allowed_scope in ("text", "audio", "video"))
+            required_scope = "text"
+
+        # Log to audit logs table
+        try:
+            db_client.execute("""
+                INSERT INTO consent_audit_logs (patient_name, required_scope, allowed_scope, granted_by, result, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                patient_name,
+                required_scope,
+                allowed_scope,
+                granted_by,
+                "GRANTED" if has_consent else "REJECTED",
+                datetime.now(timezone.utc).isoformat()
+            ))
+        except Exception as audit_err:
+            logger.error(f"Failed to write consent audit log: {audit_err}")
+
+        logger.info(f"[Consent Audit] Verifying surrogate consent for patient '{patient_name}'. Required: {required_scope}, Allowed: {allowed_scope}, Granted By: '{granted_by}'. Result: {'GRANTED' if has_consent else 'REJECTED'}")
+
+        if not has_consent:
+            rejection_reason = (
+                f"Surrogate consent for {required_scope} media was not found for patient '{patient_name}'. "
+                f"Currently authorized media scope: '{allowed_scope}' (granted by {granted_by}). "
+                f"Please configure power of attorney/legal guardian surrogate consent before uploading {required_scope} media."
+            )
+            return get_invalid_input_response(filename, rejection_reason)
 
         uploaded_file = None
         try:

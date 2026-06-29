@@ -30,7 +30,8 @@ class CoachingSynthesizer:
             for obs in analysis.behavioral_timeline
         ])
         prompt = (
-            f"You are a supportive, empathetic Caregiver Coach.\n"
+            f"You are a supportive, empathetic Caregiver Coach. You act as an educational coaching aid, not a clinical replacement. "
+            f"Do not diagnose, prescribe, or provide medical/clinical treatment advice. Focus on communication coaching and safety/redirection guidelines.\n"
             f"Translate the following clinical findings and safety evaluations into a warm, helpful report:\n\n"
             f"--- INTERACTION ANALYSIS ---\n"
             f"Behavior: {analysis.observed_behavior}\n"
@@ -57,7 +58,8 @@ class CoachingSynthesizer:
             f"5. Map the outputs to matching fields: behavior_analysis, strengths, opportunities_for_improvement, clinical_safety_flags.\n"
             f"6. Populate the 'behavioral_timeline' field with the timestamped observations provided.\n"
             f"7. Populate the 'detected_language' field with the detected language provided in the input: '{analysis.detected_language}'.\n"
-            f"8. Respond strictly in the required JSON schema."
+            f"8. For the `try_saying` field, formulate a warm, validation-first dialogue script starting with validating/empathetic phrases (e.g., 'I understand you are...', 'I see you are...', 'Let's...', 'It's safe...').\n"
+            f"9. Respond strictly in the required JSON schema."
         )
 
         response = self.client.models.generate_content(

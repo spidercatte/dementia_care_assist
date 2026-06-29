@@ -69,7 +69,23 @@ graph TD
 5. **Gemini File API Leakage (Information Disclosure)**:
    - File analysis uploads user-provided audio/video files to Gemini. If an exception occurs after upload, the cleanup code in `finally` may not execute if the server crashes or restarts. This leaves sensitive patient files on external servers.
    - **Recommendation**: Register uploads to a database or local state, and run a startup/periodic worker to garbage collect outstanding files on the Gemini File API.
+   - **Mitigation Status**: **Fully Mitigated**.
+     - *Immediate Lifecycle Cleanup*: Backend request handlers and orchestrator agent execute delete commands in `finally` blocks for both local temp files and remote Gemini files immediately upon completing analysis.
+     - *Startup Cleanup Worker*: The backend initiates an automated scanning/pruning process upon server boot to clear any orphaned files left on the Gemini File API.
+     - *Periodic Background Task*: A dedicated background worker loop runs in the FastAPI application context every 15 minutes, scanning and garbage collecting any lingering files from the Gemini File API namespace.
+     - *Native Fallback expiration*: The Gemini File API natively deletes all files after 48 hours.
+
 
 6. **Pydantic Validation DoS via Structured Outputs**:
    - If a prompt injection causes a model to emit responses that violate the Pydantic schema constraints (e.g., invalid ranges, missing fields), the parsing fails with a `ValidationError`, triggering a fallback to mock responses. This allows an attacker to easily DOS the live system.
-   - **Recommendation**: Implement retry logic with corrected prompts on parsing failure, or handle schema errors gracefully before falling back.
+    - **Recommendation**: Implement retry logic with corrected prompts on parsing failure, or handle schema errors gracefully before falling back.
+
+---
+
+## Privacy, Ethics & Patient Consent
+
+### Ethical Gating of Media Uploads
+Media analysis of a vulnerable person's worst moments (e.g. during a dementia-related behavioral crisis) raises severe ethical and legal concerns. To address this:
+- **Surrogate Consent Requirement**: Media analysis requires documented surrogate consent from the patient's legal decision-maker, scoped per media type (text, audio, or video). The system enforces this at intake (ValidationService/Orchestrator) and logs verification events for audit. We acknowledge that patients with moderate-to-advanced dementia typically cannot provide direct informed consent; consent is therefore obtained from and attributable to the designated caregiver or legal authority (such as Power of Attorney or Legal Guardian), not the patient.
+- **Gating Enforcement**: If a caregiver attempts to record or upload a video file for a patient who only has audio or text consent authorized, the system intercepts the request before it is ever sent to external APIs (like Gemini's File API), immediately returning a detailed validation error.
+- **Audit Trails**: Every verification request is logged to the `consent_audit_logs` table, storing the result (`GRANTED` or `REJECTED`), the required media scope, the authorized scope, the legal decision-maker who granted it, and the timestamp.
