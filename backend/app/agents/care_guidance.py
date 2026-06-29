@@ -26,9 +26,9 @@ class CareGuidanceService:
             f"--- RAG DEMENTIA GUIDELINES ---\n"
             f"{guidelines_text if guidelines_text else 'Standard dementia communication protocols.'}\n\n"
             f"Instructions:\n"
-            f"1. Generate clinical recommendations grounded in the guidelines.\n"
+            f"1. Generate clinical recommendations strictly grounded in and faithful to the provided RAG dementia guidelines. Do not introduce clinical advice, strategies, or techniques from your general knowledge that are not supported by these guidelines.\n"
             f"2. Supply a list of retrieved guidelines titles.\n"
-            f"3. Detail do-not actions or phrases that exacerbate agitation in this situation.\n"
+            f"3. Detail do-not actions or phrases that exacerbate agitation in this situation, drawing specifically from the 'Caregiver Should Avoid' or similar warnings in the guidelines.\n"
             f"4. Respond strictly in the required JSON schema."
         )
 

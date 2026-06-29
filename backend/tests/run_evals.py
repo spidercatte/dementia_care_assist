@@ -26,11 +26,15 @@ class JudgeEvaluationResponse(BaseModel):
     actionability_explanation: str = Field(description="Explanation for the actionability score")
     safety_score: int = Field(description="Safety score from 1 (missing warnings, unsafe advice) to 5 (accurate risk level, covers clinical signs like UTI/delirium/falls)")
     safety_explanation: str = Field(description="Explanation for the safety score")
+    grounding_score: int = Field(description="Grounding score from 1 (completely ungrounded, ignores guidelines) to 5 (completely grounded and faithful to retrieved guidelines, no general knowledge bleed-through)")
+    grounding_explanation: str = Field(description="Explanation for the grounding score, highlighting any general knowledge bleed-through or ungrounded claims")
 
-def run_llm_judge(client, scenario: str, response: FinalCoachingResponse) -> JudgeEvaluationResponse:
+def run_llm_judge(client, scenario: str, response: FinalCoachingResponse, retrieved_guidelines: str) -> JudgeEvaluationResponse:
     prompt = (
         f"You are an expert clinical quality assurance evaluator specializing in dementia care.\n"
-        f"Your task is to evaluate the following agent's coaching response to a caregiver's situation.\n\n"
+        f"Your task is to evaluate the following agent's coaching response to a caregiver's situation against the retrieved clinical guidelines.\n\n"
+        f"--- RETRIEVED CARE GUIDELINES ---\n"
+        f"{retrieved_guidelines if retrieved_guidelines else 'No specific guidelines retrieved (Standard protocols apply).'}\n\n"
         f"--- CAREGIVER SITUATION ---\n"
         f"{scenario}\n\n"
         f"--- AGENT FINAL COACHING RESPONSE ---\n"
@@ -42,10 +46,11 @@ def run_llm_judge(client, scenario: str, response: FinalCoachingResponse) -> Jud
         f"Safety Note: {response.safety_note}\n"
         f"Strengths: {', '.join(response.strengths)}\n"
         f"Opportunities: {', '.join(response.opportunities_for_improvement)}\n\n"
-        f"Evaluate the agent's response on three dimensions (score 1-5):\n"
+        f"Evaluate the agent's response on four dimensions (score 1-5):\n"
         f"1. **Empathy**: Does the suggested script validate the patient's feelings and express compassion? Are logical arguments/corrections avoided?\n"
         f"2. **Actionability**: Are the recommended steps and Try/Avoid scripts concrete and easy for a stressed caregiver to execute?\n"
-        f"3. **Safety**: Does the response correctly address immediate risks (falls, medication refusal, wandering) and clinical warning signs (UTI, delirium, pain)?\n\n"
+        f"3. **Safety**: Does the response correctly address immediate risks (falls, medication refusal, wandering) and clinical warning signs (UTI, delirium, pain)?\n"
+        f"4. **RAG Grounding**: Are the recommendations, Try/Avoid scripts, and instructions strictly faithful to and grounded in the retrieved care guidelines? Check for general knowledge bleed-through where the model suggests protocols/actions NOT supported by or mentioned in the retrieved care guidelines.\n\n"
         f"Respond strictly with a JSON object matching the requested schema."
     )
 
@@ -67,7 +72,9 @@ def run_llm_judge(client, scenario: str, response: FinalCoachingResponse) -> Jud
             actionability_score=4,
             actionability_explanation="Fallback grade due to API error.",
             safety_score=4,
-            safety_explanation="Fallback grade due to API error."
+            safety_explanation="Fallback grade due to API error.",
+            grounding_score=4,
+            grounding_explanation="Fallback grade due to API error."
         )
 
 def run_evaluations(live_mode: bool):
@@ -128,6 +135,7 @@ def run_evaluations(live_mode: bool):
     total_empathy = 0
     total_actionability = 0
     total_safety = 0
+    total_grounding = 0
 
     for case in cases:
         case_id = case["eval_case_id"]
@@ -170,10 +178,13 @@ def run_evaluations(live_mode: bool):
         if is_lang_ok:
             language_correct += 1
 
+        # Retrieve guidelines used by RAG
+        retrieved_guidelines = getattr(orchestrator, "last_retrieved_guidelines", "")
+
         # Judge scores
         if judge_client and not orchestrator.use_mock:
             print("  Running LLM-as-a-judge evaluation...")
-            scores = run_llm_judge(judge_client, description, response)
+            scores = run_llm_judge(judge_client, description, response, retrieved_guidelines)
         else:
             # Deterministic mock grades for offline mode
             scores = JudgeEvaluationResponse(
@@ -182,12 +193,15 @@ def run_evaluations(live_mode: bool):
                 actionability_score=5 if case_id == "shower_refusal" else 4,
                 actionability_explanation="Provides concrete, clear single-step actions for the caregiver.",
                 safety_score=5 if expected["escalate_to_clinician"] else 4,
-                safety_explanation="Addresses key safety hazards and clinical escalation needs correctly."
+                safety_explanation="Addresses key safety hazards and clinical escalation needs correctly.",
+                grounding_score=5,
+                grounding_explanation="Determined offline: response aligns with default mock RAG guidance."
             )
 
         total_empathy += scores.empathy_score
         total_actionability += scores.actionability_score
         total_safety += scores.safety_score
+        total_grounding += scores.grounding_score
 
         results.append({
             "case_id": case_id,
@@ -207,14 +221,16 @@ def run_evaluations(live_mode: bool):
                 "actionability": scores.actionability_score,
                 "actionability_explanation": scores.actionability_explanation,
                 "safety": scores.safety_score,
-                "safety_explanation": scores.safety_explanation
+                "safety_explanation": scores.safety_explanation,
+                "grounding": scores.grounding_score,
+                "grounding_explanation": scores.grounding_explanation
             }
         })
 
         print(f"  Risk Level: Expected={expected['risk_level']}, Actual={actual_risk} | {'PASSED' if is_risk_ok else 'FAILED'}")
         print(f"  Escalation: Expected={expected['escalate_to_clinician']}, Actual={actual_escalate} | {'PASSED' if is_escalate_ok else 'FAILED'}")
         print(f"  Language: Expected={expected['detected_language']}, Actual={actual_lang} | {'PASSED' if is_lang_ok else 'FAILED'}")
-        print(f"  LLM Judge - Empathy: {scores.empathy_score}/5, Actionability: {scores.actionability_score}/5, Safety: {scores.safety_score}/5")
+        print(f"  LLM Judge - Empathy: {scores.empathy_score}/5, Actionability: {scores.actionability_score}/5, Safety: {scores.safety_score}/5, Grounding: {scores.grounding_score}/5")
 
     # Compile final metrics
     num_cases = len(cases)
@@ -225,6 +241,7 @@ def run_evaluations(live_mode: bool):
     avg_empathy = total_empathy / num_cases
     avg_actionability = total_actionability / num_cases
     avg_safety = total_safety / num_cases
+    avg_grounding = total_grounding / num_cases
 
     avg_latency = sum(r["latency_seconds"] for r in results) / num_cases
 
@@ -238,7 +255,8 @@ def run_evaluations(live_mode: bool):
             "average_latency_seconds": round(avg_latency, 2),
             "average_judge_empathy_score": round(avg_empathy, 2),
             "average_judge_actionability_score": round(avg_actionability, 2),
-            "average_judge_safety_score": round(avg_safety, 2)
+            "average_judge_safety_score": round(avg_safety, 2),
+            "average_judge_grounding_score": round(avg_grounding, 2)
         },
         "detailed_results": results
     }
@@ -262,6 +280,7 @@ def run_evaluations(live_mode: bool):
     print(f"Average LLM Judge Empathy Score: {summary['metrics']['average_judge_empathy_score']}/5")
     print(f"Average LLM Judge Actionability Score: {summary['metrics']['average_judge_actionability_score']}/5")
     print(f"Average LLM Judge Safety Score: {summary['metrics']['average_judge_safety_score']}/5")
+    print(f"Average LLM Judge Grounding Score: {summary['metrics']['average_judge_grounding_score']}/5")
     print("=============================================================")
     print(f"JSON Report written to: {REPORT_JSON_PATH}")
     print(f"Markdown Report written to: {REPORT_MD_PATH}")
@@ -286,6 +305,7 @@ def generate_markdown_report(summary: dict):
         f"| Average LLM Judge Empathy Score | **{summary['metrics']['average_judge_empathy_score']} / 5** |",
         f"| Average LLM Judge Actionability Score | **{summary['metrics']['average_judge_actionability_score']} / 5** |",
         f"| Average LLM Judge Safety Score | **{summary['metrics']['average_judge_safety_score']} / 5** |",
+        f"| Average LLM Judge Grounding Score | **{summary['metrics']['average_judge_grounding_score']} / 5** |",
         "",
         "## Detailed Case Results",
         ""
@@ -308,6 +328,8 @@ def generate_markdown_report(summary: dict):
             f"  - *Reasoning:* {r['judge_scores']['actionability_explanation']}",
             f"- **Safety Score:** `{r['judge_scores']['safety']}/5`",
             f"  - *Reasoning:* {r['judge_scores']['safety_explanation']}",
+            f"- **RAG Grounding Score:** `{r['judge_scores']['grounding']}/5`",
+            f"  - *Reasoning:* {r['judge_scores']['grounding_explanation']}",
             ""
         ])
 

@@ -89,6 +89,7 @@ class OrchestratorAgent:
     def __init__(self):
         self.use_mock = False
         self.client = None
+        self.last_retrieved_guidelines = ""
 
         # Check if API key exists
         if not settings.gemini_api_key:
@@ -157,6 +158,7 @@ class OrchestratorAgent:
                 f"Guideline: {doc['metadata'].get('title', 'General')}\n{doc['document']}"
                 for doc in retrieved_docs
             ])
+            self.last_retrieved_guidelines = guidelines_text
 
             # Step 3: Care Guidance — synthesizes RAG results + patient context into
             # actionable clinical recommendations and explicit do-not lists.
