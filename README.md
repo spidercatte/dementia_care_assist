@@ -113,6 +113,8 @@ Concretely, the system:
          └────────────────────────────────────────┘
 ```
 
+![alt text](image.png)
+
 ### Database Tables
 
 | Table | Purpose |
