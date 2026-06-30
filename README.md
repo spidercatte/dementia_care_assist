@@ -16,17 +16,25 @@ DementiaCare Coach helps family and clinical caregivers manage difficult dementi
 
 ## The Problem
 
-Over 55 million people worldwide live with dementia. The majority are cared for at home by family members who receive little to no professional training. When a patient becomes agitated, refuses medication, or exhibits distressing behaviors, caregivers often respond intuitively — and frequently make the situation worse by correcting the patient's reality, arguing, or rushing them.
+Over 55 million people worldwide live with dementia. Most are cared for at home by a single family member — a spouse, an adult child, a sibling — who stepped into the role without training and without a realistic picture of how consuming it would become. When a patient becomes agitated, refuses medication, or exhibits distressing behaviors, caregivers respond intuitively — and frequently make the situation worse by correcting the patient's reality, arguing, or rushing them.
 
-The result: escalating distress for the patient, caregiver burnout, and unnecessary institutionalization.
+The standard advice is to share the load: hire a Personal Support Worker, arrange respite care. The logic is sound. The reality is devastating.
 
-**There is no always-available, personalized coach standing beside a caregiver at 2am when their loved one is having a crisis.**
+**Dementia profoundly changes how the brain processes trust and familiarity.** Patients in moderate to advanced stages frequently experience heightened paranoia and severe anxiety around unfamiliar faces. When a new face enters the home — even a warm, trained, well-intentioned one — the patient's brain may register that person as an intruder. The result: resistance, agitation, and distress. Help arrives cold.
+
+This creates a trap families cycle through for years: the primary caregiver burns out, but every attempt to bring in support makes the patient worse — which increases guilt, which accelerates the burnout. No existing tool addresses this transition problem directly.
+
+**There is no always-available, personalized coach standing beside a caregiver at 2am — and no way for every new person entering the care circle to arrive already knowing the patient.**
 
 ---
 
 ## The Solution
 
-DementiaCare Coach is a multi-modal AI agent that:
+DementiaCare Coach is a multi-agent AI system designed to solve two problems simultaneously: coaching caregivers through difficult interactions in real time, and acting as an onboarding engine for every new person entering the care circle.
+
+The platform learns the patient. Over time, through profile setup and automatic enrichment from real coaching conversations, the system builds a detailed picture — not just clinically, but as a person: the music they respond to, the phrases that calm them, the topics that trigger distress, the approaches that have worked. When a new PSW starts, they do not arrive cold.
+
+Concretely, the system:
 
 1. **Analyzes caregiver-patient interactions** — via uploaded video, audio, or written description
 2. **Retrieves evidence-based clinical guidelines** from a RAG-indexed vector store
@@ -40,7 +48,7 @@ DementiaCare Coach is a multi-modal AI agent that:
 
 | Concept | Where |
 |---|---|
-| **Multi-agent system (ADK)** | `adk-agent-scaffold/app/agent.py` — ADK conversational coach; `backend/app/agents/` — 7-agent pipeline |
+| **Multi-agent system** | 6-step analysis pipeline in `backend/app/agents/`; ADK conversational agent in `adk-agent-scaffold/app/agent.py` |
 | **MCP Server** | `mcp_server/app/mcp_server.py` — standalone FastMCP service over SSE on port 8002, consumed by the ADK agent |
 | **Human-in-the-Loop (HITL)** | Tiered-Uncertainty Profile Architecture: `ProfileEnricherAgent` detects new triggers/preferences with confidence ratings and source evidence; surfaces them to the caregiver for approval as Confirmed or Suspected (to monitor); caregiver can toggle confirmation status directly on tags |
 | **Security features** | `backend/app/main.py` — API key auth (`X-API-Key`), rate limiting (60 req/min/IP), CORS |
@@ -116,7 +124,7 @@ DementiaCare Coach is a multi-modal AI agent that:
 
 ---
 
-### The 7-Agent Pipeline (detail)
+### The Analysis Pipeline (detail)
 
 Each step is a dedicated Gemini agent with a narrow system prompt and an enforced Pydantic output schema (`response_mime_type="application/json"`). Splitting across agents reduces hallucination: each agent is primed only with context relevant to its task, and failures are diagnosable per step.
 
@@ -129,7 +137,7 @@ Each step is a dedicated Gemini agent with a narrow system prompt and an enforce
 | 3 | `CareGuidanceService` | `CareGuidanceResponse` | Synthesize RAG results into clinical recommendations & do-not lists |
 | 4 | `SafetyEvaluator` | `SafetyEscalationResponse` | Dedicated safety pass — never buried in coaching output |
 | 5 | `CoachingSynthesizer` | `FinalCoachingResponse` | Assemble full coaching response with scripts, strengths, recommendations |
-| 6 | `ProfileEnricherAgent` | `ProfileEnrichmentResponse` | Runs after each coach chat turn; detects new triggers/preferences worth adding to the patient profile and returns them as HITL suggestions |
+| Post-conversation | `ProfileEnricherAgent` | `ProfileEnrichmentResponse` | Runs after each coach chat turn (not part of the analysis pipeline); detects new triggers/preferences and returns them as HITL suggestions for caregiver approval |
 
 ---
 
@@ -418,6 +426,22 @@ To safeguard sensitive data, raw media files (images, video, audio) are **never 
 4. **Text-Only Logging**: Only the abstracted text-based clinical summary (agitation level, behavior summary, likely trigger, and dialog suggestions) is retained in the database logs to show interaction history. No raw media is saved. Caregivers can wipe this text history permanently at any time via the UI.
 
 See [`threat_model.md`](./threat_model.md) for the full security threat model.
+
+---
+
+## Impact
+
+DementiaCare Coach addresses a specific, underserved failure point: the moment care tries to expand and fails. Primary caregivers can finally take breaks because new caregivers enter the home informed rather than cold. New caregivers experience fewer crisis interactions early on, making them more likely to continue helping. Patients receive more consistent, evidence-aligned care from every person in their circle, reducing behavioral episodes over time. Safety risks are flagged and persisted for clinical review. The patient's care profile grows more accurate with every interaction — automatically, with caregiver consent.
+
+---
+
+## Future Work
+
+- **Care circle shift handoffs** — automatically generated handoff notes from interaction history, so every shift starts informed
+- **Real-time coaching** — live audio analysis during an interaction, not just post-hoc review
+- **Wearable integration** — passive agitation monitoring from patient heart rate and movement data
+- **EHR integration** — pull medication lists, care plans, and diagnostic history to seed the patient profile
+- **Predictive behavior forecasting** — anticipate high-risk periods (sundowning windows, post-visit agitation cycles) from interaction patterns
 
 ---
 
