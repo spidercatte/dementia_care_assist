@@ -1,3 +1,5 @@
+<img width="1672" height="941" alt="project_app" src="https://github.com/user-attachments/assets/31dea329-072c-4329-9eec-3a5f7edc993b" />
+
 # DementiaCare Coach
 **An AI-Powered Caregiver Co-Pilot | Kaggle AI Agents Capstone — Agents for Good**
 
