@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Activity,
   User,
@@ -14,21 +14,18 @@ import {
   Trash2,
   Plus,
   Search,
-  Database,
   Sparkles,
   RefreshCw,
   Info,
   Clock,
   History,
   Video,
-  VideoOff,
   Mic,
   Square,
   Volume2,
   Circle,
   Sun,
-  Moon,
-  LogOut
+  Moon
 } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
@@ -185,27 +182,19 @@ function App() {
   // Navigation & Config State
   const [activeTab, setActiveTab] = useState('dashboard');
   const [backendStatus, setBackendStatus] = useState('checking'); // checking, online, offline
-  const [isSeeding, setIsSeeding] = useState(false);
-
   // Authentication State
-  const [apiKey, setApiKey] = useState(() => {
-    return localStorage.getItem('user_api_key') || DEFAULT_USER_API_KEY;
-  });
+  const apiKey = localStorage.getItem('user_api_key') || DEFAULT_USER_API_KEY;
 
   const secureFetch = async (url, options = {}) => {
     const headers = {
       ...options.headers,
       ...(apiKey ? { 'X-API-Key': apiKey } : {})
     };
-    try {
-      const res = await fetch(url, { ...options, headers });
-      if (res.status === 401) {
-        console.error('API request returned 401 Unauthorized.');
-      }
-      return res;
-    } catch (err) {
-      throw err;
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401) {
+      console.error('API request returned 401 Unauthorized.');
     }
+    return res;
   };
 
   // Patient Profile State
@@ -538,30 +527,17 @@ function App() {
     if (patient && patient.name) {
       loadPatientHistory(patient.name);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patient.name, backendStatus]);
 
   // Check backend health on load
   useEffect(() => {
     checkBackendHealth();
     loadPatientData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey]); // reload when API Key changes
 
 
-  const seedDatabase = async () => {
-    setIsSeeding(true);
-    try {
-      const res = await secureFetch(`${BACKEND_URL}/guidelines/seed`, { method: 'POST' });
-      if (res.ok) {
-        alert('Dementia care guidelines successfully seeded into vector database!');
-      } else {
-        alert('Failed to seed guidelines.');
-      }
-    } catch (e) {
-      alert('Error connecting to backend: ' + e.message);
-    } finally {
-      setIsSeeding(false);
-    }
-  };
 
   // ----------------------------------------------------
   // Profile Editor Actions
@@ -917,7 +893,6 @@ function App() {
     if (!result) return null;
 
     // Select translation mapping
-    let translated = { ...result };
 
     // Pre-baked mappings for high-fidelity testing
     const tlMap = {
@@ -1098,9 +1073,9 @@ function App() {
   };
 
   const mockSimResponse = (input, history) => {
-    let responseText = "";
-    let deltaAgitation = 0;
-    let tip = "";
+    let responseText;
+    let deltaAgitation;
+    let tip;
     const inputLower = input.toLowerCase();
 
     if (selectedScenario.id === 'med_refusal') {
