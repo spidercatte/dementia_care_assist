@@ -348,6 +348,14 @@ This project uses the **Antigravity** agent framework. All project skills, hooks
 
 Each skill is self-contained with a `SKILL.md` that describes its steps and purpose.
 
+### Running Agent Skills via Slash Commands
+If you are pair-programming with the Antigravity agent, you can invoke these skills directly from the chat UI by typing their slash commands:
+* `/dementiacare-setup` — Bootstraps the local environment, configures virtualenvs, and installs dependencies.
+* `/dementiacare-run-all` — Automates the full startup sequence (setup → backend → seed RAG → frontend).
+* `/dementiacare-seed-rag` — Re-seeds the local vector database with clinical guidelines.
+* `/dementiacare-stop-all` — Gracefully stops all active backend and frontend development processes.
+* `/dementiacare-cleanup-ports` — Force-kills any process running on ports 8000 and 5173.
+
 ---
 
 ## Project Structure

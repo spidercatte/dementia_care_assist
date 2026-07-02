@@ -27,11 +27,13 @@ class GeminiEmbeddingFunction(EmbeddingFunction):
                 logger.warning("Gemini API Client is not initialized. Generating dummy mock embeddings.")
                 return cast(Embeddings, [[0.0] * 768 for _ in texts])
         try:
+            from google.genai import types
             embeddings = []
             for text in texts:
                 response = self.client.models.embed_content(
-                    model="text-embedding-004",
-                    contents=text
+                    model="gemini-embedding-2",
+                    contents=text,
+                    config=types.EmbedContentConfig(output_dimensionality=768)
                 )
                 if response.embeddings and len(response.embeddings) > 0 and response.embeddings[0].values:
                     embeddings.append(response.embeddings[0].values)

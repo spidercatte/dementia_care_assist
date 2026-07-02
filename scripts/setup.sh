@@ -34,10 +34,32 @@ poetry run pip install -r requirements.txt
 if [ ! -f ".env" ]; then
     echo "Creating .env from .env.example..."
     cp .env.example .env
-    echo "Note: Please update the GEMINI_API_KEY inside backend/.env if you want to use the live AI features instead of Mock Mode."
 else
     echo ".env file already exists."
 fi
+
+# Auto-copy GEMINI_API_KEY from root .env to backend/.env if root .env exists
+python3 -c "
+import os
+root_env = '$WORKSPACE_DIR/.env'
+backend_env = '$WORKSPACE_DIR/backend/.env'
+if os.path.exists(root_env) and os.path.exists(backend_env):
+    with open(root_env, 'r') as f:
+        root_lines = f.readlines()
+    key = None
+    for line in root_lines:
+        if line.strip().startswith('GEMINI_API_KEY='):
+            key = line.strip().split('=', 1)[1].strip('\"\'')
+            break
+    if key and key != 'your_gemini_api_key_here':
+        with open(backend_env, 'r') as f:
+            content = f.read()
+        if 'GEMINI_API_KEY=your_gemini_api_key_here' in content:
+            content = content.replace('GEMINI_API_KEY=your_gemini_api_key_here', f'GEMINI_API_KEY={key}')
+            with open(backend_env, 'w') as f:
+                f.write(content)
+            print('--> Automatically copied GEMINI_API_KEY from root .env to backend/.env')
+"
 
 # 2. Setup Frontend
 echo "--> Configuring Frontend..."
