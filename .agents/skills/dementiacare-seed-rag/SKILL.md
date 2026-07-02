@@ -14,7 +14,7 @@ This skill automates the seeding process of the ChromaDB RAG Guidelines database
 
 1. Execute the seeding script using the `run_command` tool:
    ```bash
-   /workspaces/dementia_care_assist/scripts/seed_rag.sh
+   ./scripts/seed_rag.sh
    ```
 2. Verify that:
    - The script output prints `=== Seeding Completed! ===` and does not throw errors.

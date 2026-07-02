@@ -14,5 +14,5 @@ This skill builds and deploys only the frontend UI container image to the Google
 
 1. Run the frontend deployment script:
    ```bash
-   /workspaces/dementia_care_assist/scripts/deploy_prod_frontend.sh
+   ./scripts/deploy_prod_frontend.sh
    ```

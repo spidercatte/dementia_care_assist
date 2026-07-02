@@ -15,25 +15,25 @@ This skill automates the full boot sequence of the DementiaCare Coach applicatio
 1. **Step 1: Environment Setup**
    Run the setup script synchronously:
    ```bash
-   /workspaces/dementia_care_assist/scripts/setup.sh
+   ./scripts/setup.sh
    ```
 
 2. **Step 2: Start backend**
    Run the backend start script asynchronously. Use `WaitMsBeforeAsync` value of `500` ms (or let it run in the background as an asynchronous task):
    ```bash
-   /workspaces/dementia_care_assist/scripts/run_backend.sh
+   ./scripts/run_backend.sh
    ```
 
 3. **Step 3: Seed Guidelines (RAG)**
    Run the seed RAG script synchronously to populate ChromaDB:
    ```bash
-   /workspaces/dementia_care_assist/scripts/seed_rag.sh
+   ./scripts/seed_rag.sh
    ```
 
 4. **Step 4: Start frontend**
    Run the frontend start script asynchronously. Use `WaitMsBeforeAsync` value of `500` ms (or let it run in the background as an asynchronous task):
    ```bash
-   /workspaces/dementia_care_assist/scripts/run_frontend.sh
+   ./scripts/run_frontend.sh
    ```
 
 5. **Step 5: Verification**

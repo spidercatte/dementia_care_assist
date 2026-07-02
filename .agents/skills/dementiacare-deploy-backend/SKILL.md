@@ -14,5 +14,5 @@ This skill builds and deploys only the backend container image to the Google Clo
 
 1. Run the backend deployment script:
    ```bash
-   /workspaces/dementia_care_assist/scripts/deploy_prod_backend.sh
+   ./scripts/deploy_prod_backend.sh
    ```

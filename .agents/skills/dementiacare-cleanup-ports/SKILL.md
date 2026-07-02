@@ -14,5 +14,5 @@ This skill stops any running processes listening on port 8000 (backend) or port 
 
 1. Run the port cleanup script:
    ```bash
-   /workspaces/dementia_care_assist/scripts/cleanup_ports.sh
+   ./scripts/cleanup_ports.sh
    ```

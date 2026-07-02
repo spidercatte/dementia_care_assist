@@ -15,7 +15,7 @@ This skill stops all running DementiaCare Coach services: the FastAPI backend (p
 Run the existing cleanup script from the project root:
 
 ```bash
-bash /workspaces/dementia_care_assist/scripts/cleanup_ports.sh
+bash ./scripts/cleanup_ports.sh
 ```
 
 If the script is unavailable, stop each service manually:

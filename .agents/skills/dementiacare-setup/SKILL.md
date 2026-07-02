@@ -14,7 +14,7 @@ This skill automates the installation of dependencies and initialization of envi
 
 1. Execute the workspace setup script using the `run_command` tool:
    ```bash
-   /workspaces/dementia_care_assist/scripts/setup.sh
+   ./scripts/setup.sh
    ```
 2. Verify that:
    - `backend/venv` exists and contains the python packages.

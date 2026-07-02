@@ -15,7 +15,7 @@ This skill automates starting the Vite development server using the run script.
 1. Start the frontend by executing the run frontend script using the `run_command` tool.
    Use a `WaitMsBeforeAsync` value of `500` ms (or let it run in the background as an asynchronous task):
    ```bash
-   /workspaces/dementia_care_assist/scripts/run_frontend.sh
+   ./scripts/run_frontend.sh
    ```
 2. Verify that the server is up:
    - Check http://localhost:5173
