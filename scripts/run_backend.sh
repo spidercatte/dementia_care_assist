@@ -3,7 +3,8 @@
 # DementiaCare Coach Run Backend Script
 # Starts the FastAPI backend using uvicorn.
 
-WORKSPACE_DIR="/workspaces/dementia_care_assist"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+WORKSPACE_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
 echo "=== Starting DementiaCare Coach Backend ==="
 cd "$WORKSPACE_DIR/backend"
 

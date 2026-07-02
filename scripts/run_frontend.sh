@@ -3,7 +3,8 @@
 # DementiaCare Coach Run Frontend Script
 # Starts the Vite development server for the React frontend.
 
-WORKSPACE_DIR="/workspaces/dementia_care_assist"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+WORKSPACE_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
 echo "=== Starting DementiaCare Coach Frontend ==="
 cd "$WORKSPACE_DIR/frontend"
 

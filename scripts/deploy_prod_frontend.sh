@@ -5,7 +5,8 @@ set -e
 # DementiaCare Coach Production Frontend Deployment Script
 # ==============================================================================
 
-WORKSPACE_DIR="/workspaces/dementia_care_assist"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+WORKSPACE_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
 TERRAFORM_DIR="$WORKSPACE_DIR/adk-agent-scaffold/deployment/terraform/single-project"
 VARS_FILE="$TERRAFORM_DIR/vars/env.tfvars"
 

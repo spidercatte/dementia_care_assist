@@ -4,7 +4,8 @@ set -e
 # DementiaCare Coach Setup Script
 # Installs backend virtual environment, backend dependencies, and frontend packages.
 
-WORKSPACE_DIR="/workspaces/dementia_care_assist"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+WORKSPACE_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
 echo "=== Setting up DementiaCare Coach in $WORKSPACE_DIR ==="
 
 # Check if environment is already setup to skip installation
